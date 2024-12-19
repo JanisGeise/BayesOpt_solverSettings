@@ -1,0 +1,3 @@
+pandas
+ax-platform
+matplotlib

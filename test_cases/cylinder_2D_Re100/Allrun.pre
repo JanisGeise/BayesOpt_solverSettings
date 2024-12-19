@@ -1,0 +1,23 @@
+#!/bin/bash
+cd "${0%/*}" || exit
+. "${WM_PROJECT_DIR:?}"/bin/tools/RunFunctions
+#------------------------------------------------------------------------------
+
+# dummy file for post-processing with paraview
+touch post.foam
+
+# mesh creation
+runApplication blockMesh
+runApplication checkMesh -allGeometry -allTopology
+
+# set inlet velocity
+cp -r 0.org 0
+runApplication setExprBoundaryFields
+
+# parallel run
+runApplication decomposePar
+runParallel renumberMesh -overwrite
+runParallel potentialFoam -writephi
+runParallel $(getApplication)
+
+#------------------------------------------------------------------------------
