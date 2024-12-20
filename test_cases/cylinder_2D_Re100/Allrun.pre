@@ -3,8 +3,14 @@ cd "${0%/*}" || exit
 . "${WM_PROJECT_DIR:?}"/bin/tools/RunFunctions
 #------------------------------------------------------------------------------
 
-# dummy file for post-processing with paraview
-touch post.foam
+# specify refinement level
+# mesh 0
+# cp system/blockMeshDict.m0 system/blockMeshDict
+# sed -i "s/^deltaT.*/deltaT          2.0e-3;/" system/controlDict
+
+# mesh 1
+cp system/blockMeshDict.m1 system/blockMeshDict
+sed -i "s/^deltaT.*/deltaT          1.0e-3;/" system/controlDict
 
 # mesh creation
 runApplication blockMesh

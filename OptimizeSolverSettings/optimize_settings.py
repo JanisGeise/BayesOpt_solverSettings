@@ -4,7 +4,6 @@
 import logging
 
 from glob import glob
-from typing import Union
 from torch import device
 from os.path import join
 from pandas import read_csv
@@ -19,112 +18,125 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-def compute_elapsed_time(load_path: str, t_start: Union[int, float], t_end: Union[int, float]) -> float:
-    """
-    compute the elapsed CPU time for a given interval
+class OptimizeSolverSettings:
+    def __init__(self, training_path: str, buffer_size: int, n_runner: int, simulation: str = "cylinder_2D_Re100",
+                 seed: int = 0):
+        self._buffer_size = buffer_size
+        self._executer = Executer(simulation=simulation, buffer_size=buffer_size, n_runner=n_runner,
+                                  run_directory=training_path)
+        self._ax = AxClient(random_seed=seed, torch_device=device("cpu"))
+        self._parser = ManipulateSolverSettings(self._executer.run_directory)
+        self._gamg_settings = GAMGSolverOptions()
+        self._solver_dict = self._gamg_settings.create_default_dict()
 
-    :param load_path: path to the directory should be either 'base' or 'copy_*'
-    :param t_start: interval's physical start time
-    :param t_end: interval's physical end time
-    :return: elapsed CPU time between the start and the end of the interval
-    """
-    t = read_csv(glob(join(load_path, "postProcessing", "time", "*", "timeInfo.dat"))[0], header=None,
-                 sep=r"\s+", skiprows=1, usecols=[0, 1], names=["t", "t_cpu_cum"])
+    def prepare(self):
+        self._executer.prepare()
 
-    # execution time is logged beginning after the first time step, so except for the base case it will always be zero
-    start = t["t_cpu_cum"][t["t"] == t_start].values
-    if start.size == 0:
-        start = 0
+    def optimize(self, intervals: list[tuple], parameters: list[dict], n_trials_max: int = 15,
+                 restart: bool = False) -> None:
+        # we assume that the parameters to optimize remain the same for all intervals
+        for idx, i in enumerate(intervals):
+            logger.info(f"Starting with optimization for interval {i}.")
+            self._executer.start_time = i[0]
+            self._executer.end_time = i[1]
 
-    # if simulation didn't converge assign high value, else assign the correct elapsed time
-    t_end = 9999 if t["t"].iloc[-1] < t_end else t["t_cpu_cum"][t["t"] == t_end].values
-    return float(t_end - start)
+            # execute the optimization loop
+            self._execute_optimization(parameters, i, n_trials_max, restart)
 
+    def _compute_elapsed_time(self, load_path: str) -> float:
+        """
+        compute the elapsed CPU time for a given interval
 
-def run_trial(executer: Executer, solver_dict: list) -> dict:
-    """
-    executes a single optimization for a series of solver settings
+        :param load_path: path to the directory should be either 'base' or 'copy_*'
+        :return: elapsed CPU time between the start and the end of the interval
+        """
+        t = read_csv(glob(join(load_path, "postProcessing", "time", "*", "timeInfo.dat"))[0], header=None,
+                     sep=r"\s+", skiprows=1, usecols=[0, 1], names=["t", "t_cpu_cum"])
 
-    :param executer: executer handling the parallel execution of the simulations
-    :param solver_dict: dict containing the solver settings to run the simulation with
-    :return: dict containing the loss as a ratio between execution time with the current settings and the baseline
-    """
-    # determine execution time for the baseline case
-    t_start, t_end = executer.start_time, executer.end_time
-    dt_base = compute_elapsed_time(join(executer.run_directory, "base"), t_start, t_end)
+        # execution time is logged beginning after the first time step, except for the base case it will always be zero
+        start = t["t_cpu_cum"][t["t"] == self._executer.start_time].values
+        if start.size == 0:
+            start = 0
 
-    # instantiate parser for manipulating the solver settings, assume all copies have the same settings
-    parser = ManipulateSolverSettings(executer.run_directory)
+        # if simulation didn't converge assign high value, else assign the correct elapsed time
+        if t["t"].iloc[-1] < self._executer.end_time:
+            t_end = 9999
+        else:
+            t_end = t["t_cpu_cum"][t["t"] == self._executer.end_time].values
+        return float(t_end - start)
 
-    # update dict for all copies
-    for no in range(executer.buffer_size):
-        parser.replace_settings(solver_dict[no], f"copy_{no}")
+    def _run_trial(self, solver_dict: list) -> dict:
+        """
+        executes a single optimization for a series of solver settings
 
-    # execute the simulations in the copy_* directories with the new settings
-    executer.execute()
+        :param solver_dict: dict containing the solver settings to run the simulation with
+        :return: dict containing the loss as a ratio between execution time with the current settings and the baseline
+        """
+        # determine execution time for the baseline case
+        dt_base = self._compute_elapsed_time(join(self._executer.run_directory, "base"))
 
-    # get the execution time for each setting and compare it to the baseline
-    dt_copies = [compute_elapsed_time(join(executer.run_directory, f"copy_{i}"), t_start, t_end) for i in
-                 range(executer.buffer_size)]
+        # instantiate parser for manipulating the solver settings, assume all copies have the same settings
+        parser = ManipulateSolverSettings(self._executer.run_directory)
 
-    return {"loss": tuple([i / dt_base for i in dt_copies])}
+        # update dict for all copies
+        for no in range(self._buffer_size):
+            parser.replace_settings(solver_dict[no], f"copy_{no}")
 
+        # execute the simulations in the copy_* directories with the new settings
+        self._executer.execute()
 
-def execute_optimization(executer: Executer, parameters: list[dict], i: tuple, seed: int = 0, n_trials_max: int = 15,
-                         restart: bool = False):
-    """
-    wrapper for executing the Bayesian optimization loop for finding the optimal solver settings for a given interval
+        # get the execution time for each setting and compare it to the baseline
+        dt_copies = [self._compute_elapsed_time(join(self._executer.run_directory, f"copy_{i}")) for i in
+                     range(self._buffer_size)]
 
-    :param executer: executer handling the parallel execution of the simulation
-    :param parameters: list containing the dicts for the solver settings to optimize
-    :param i: current interval
-    :param seed: seed value
-    :param n_trials_max: max. number of optimization iterations
-    :param restart: a restart option for continue a previous optimization
-    :return: None
-    """
-    # don't run on GPU
-    ax = AxClient(random_seed=seed, torch_device=device("cpu"))
+        return {"loss": tuple([i / dt_base for i in dt_copies])}
 
-    # load if option restart is set TODO: model still starts from scratch if restart is set
-    if restart:
-        raise NotImplementedError
-        # logger.info("Loading state dict.")
-        # throws error
-        # ax.load_experiment(join(executer.run_directory, f"client_interval_{i[0]}_to_{i[1]}.json"))
-        # ax.load_from_json_file(join(executer.run_directory, f"client_interval_{i[0]}_to_{i[1]}.json"))
+    def _execute_optimization(self, parameters: list[dict], i: tuple, n_trials_max: int = 50,
+                              restart: bool = False) -> None:
+        """
+        wrapper for executing the Bayesian optimization loop for finding the optimal solver settings for a given
+        interval
 
-    else:
-        # TODO: how determine convergence? -> early_stopping as kwarg -> usage?
-        ax.create_experiment(name="experiment", parameters=parameters,
-                             overwrite_existing_experiment=True if restart else False,
-                             objectives={"loss": ObjectiveProperties(minimize=True)})
+        :param parameters: list containing the dicts for the solver settings to optimize
+        :param i: current interval
+        :param n_trials_max: max. number of optimization iterations
+        :param restart: a restart option for continue a previous optimization
+        :return: None
+        """
+        # load if option restart is set TODO: model still starts from scratch if restart is set
+        if restart:
+            raise NotImplementedError
+            # logger.info("Loading state dict.")
+            # throws error
+            # ax.load_experiment(join(executer.run_directory, f"client_interval_{i[0]}_to_{i[1]}.json"))
+            # ax.load_from_json_file(join(executer.run_directory, f"client_interval_{i[0]}_to_{i[1]}.json"))
 
-    # initialize solver dict, get all mandatory settings to make sure nothing is missing
-    gamg_settings = GAMGSolverOptions()
-    solver_dict = gamg_settings.create_default_dict()
+        else:
+            # TODO: how determine convergence? -> early_stopping as kwarg -> usage?
+            self._ax.create_experiment(name="experiment", parameters=parameters,
+                                       objectives={"loss": ObjectiveProperties(minimize=True)})
 
-    # execute the optimization loop
-    for _ in range(n_trials_max):
-        # TODO: how to sample N_buffer different settings for each runner? -> we need to create N_buffer dicts
-        next_parameters, trial_index = ax.get_next_trial()
+        # execute the optimization loop
+        for _ in range(n_trials_max):
+            # TODO: how to sample N_buffer different settings for each runner?
+            next_parameters, trial_index = self._ax.get_next_trial()
 
-        # replace solver dict settings with new settings
-        all_solver_dicts = []
-        for _ in range(executer.buffer_size):
-            for key, value in next_parameters.items():
-                solver_dict[key] = value
-            all_solver_dicts.append(solver_dict)
+            # replace solver dict settings with new settings
+            all_solver_dicts = []
+            for _ in range(self._buffer_size):
+                for key, value in next_parameters.items():
+                    self._solver_dict[key] = value
+                all_solver_dicts.append(self._solver_dict)
 
-        loss = run_trial(executer, all_solver_dicts)
-        # TODO: sequential doesn't work with tuple of len 1, so unpack
-        ax.complete_trial(trial_index=trial_index, raw_data={"loss": loss["loss"][0]})
+            loss = self._run_trial(all_solver_dicts)
+            # TODO: sequential doesn't work with tuple of len 1, so unpack
+            self._ax.complete_trial(trial_index=trial_index, raw_data={"loss": loss["loss"][0]})
 
-        # save optimization results for each interval, save() raises NotImplementedError
-        ax.save_to_json_file(join(executer.run_directory, f"client_interval_{i[0]}_to_{i[1]}.json"))
+            # save optimization results for each interval, save() raises NotImplementedError
+            self._ax.save_to_json_file(join(self._executer.run_directory, f"client_interval_{i[0]}_to_{i[1]}.json"))
 
-    # print some output
-    logger.info(f"\nOptimal parameters for interval {i}:", ax.get_best_parameters(), "\n")
+        # print some output
+        logger.info(f"\nOptimal parameters for interval {i}:", self._ax.get_best_parameters(), "\n")
 
 
 if __name__ == "__main__":
