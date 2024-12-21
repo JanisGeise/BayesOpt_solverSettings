@@ -50,8 +50,11 @@ if __name__ == "__main__":
     ]
 
     # instantiate optimizer
-    # TODO: running in parallel increases elapsed time -> issue bc same problem for all optimization loops?
-    optimize_solver_settings = OptimizeSolverSettings(train_dir, 1, 1)
+    # TODO: running in parallel increases elapsed time
+    #       -> issue bc if one runner finishes, the remaining runner is faster
+    #       -> introduces error in the uncertainty
+    #       -> so we can set buffer size to > 1, but n_runner need to be 1 at the moment
+    optimize_solver_settings = OptimizeSolverSettings(train_dir, 4)
 
     # test: we need to add the path to bashrc of openfoam first if executed from within an IDE
     set_openfoam_bashrc(join(train_dir, "base"))

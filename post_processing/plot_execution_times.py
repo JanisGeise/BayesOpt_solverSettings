@@ -33,6 +33,9 @@ if __name__ == "__main__":
     cases = [f"default_mesh{mesh}", f"first_tests_mesh{mesh}"]
     legend = ["default", "first test"]
 
+    # end times of the chosen intervals for which the optimization was executed, if nothing was changed use empty list
+    interval = [[], [1, 3]]
+
     # create save directory if not exists
     if not exists(save_path):
         makedirs(save_path)
@@ -50,8 +53,8 @@ if __name__ == "__main__":
     default_idx = 0
     fig, ax = plt.subplots(1, 1, figsize=(6, 3))
     for i, t in enumerate(t_cum):
-        ax.errorbar(legend[i], t.mean() / t_cum[default_idx].mean(), yerr=t.std() / t_cum[default_idx].mean(),
-                    barsabove=True, fmt="o", capsize=5)
+        ax.errorbar(legend[i], t.mean() / t_cum[default_idx].mean(), yerr=t.std() / t.mean(), barsabove=True, fmt="o",
+                    capsize=5)
 
     ax.set_ylabel("$t / t_{base}$")
     fig.tight_layout()
@@ -72,6 +75,8 @@ if __name__ == "__main__":
         # smooth the results for better comparison
         ax.plot(e.t, gaussian_filter1d(e.t_cpu.values, 3), zorder=10, color=color[i], label=legend[i])
         ax.plot(e.t, e.t_cpu.values, alpha=0.2, color=color[i])
+        if interval[i]:
+            [ax.axvline(iv, color="red", ls=":") for iv in interval[i]]
     ax.set_xlim(exec_times[0].t.min(), exec_times[0].t.max())
     ax.set_xlabel(r"$t$ $[s]$")
     ax.set_ylabel(r"$t$ per $\Delta t$ $[s]$")

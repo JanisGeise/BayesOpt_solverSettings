@@ -6,9 +6,11 @@ import logging
 from glob import glob
 from torch import device
 from os.path import join
+from copy import deepcopy
 from pandas import read_csv
 from ax.service.ax_client import AxClient
 from ax.service.utils.instantiation import ObjectiveProperties
+from ax.early_stopping.strategies import PercentileEarlyStoppingStrategy
 
 from .execution import Executer
 from .solver_options import GAMGSolverOptions
@@ -19,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 class OptimizeSolverSettings:
-    def __init__(self, training_path: str, buffer_size: int, n_runner: int, simulation: str = "cylinder_2D_Re100",
+    def __init__(self, training_path: str, buffer_size: int, n_runner: int = 1, simulation: str = "cylinder_2D_Re100",
                  seed: int = 0):
         self._buffer_size = buffer_size
         self._executer = Executer(simulation=simulation, buffer_size=buffer_size, n_runner=n_runner,
@@ -28,11 +30,15 @@ class OptimizeSolverSettings:
         self._parser = ManipulateSolverSettings(self._executer.run_directory)
         self._gamg_settings = GAMGSolverOptions()
         self._solver_dict = self._gamg_settings.create_default_dict()
+        self._dt_base = None
 
     def prepare(self):
         self._executer.prepare()
 
-    def optimize(self, intervals: list[tuple], parameters: list[dict], n_trials_max: int = 15,
+        # determine execution time for the baseline case
+        self._dt_base = self._compute_elapsed_time(join(self._executer.run_directory, "base"))
+
+    def optimize(self, intervals: list[tuple], parameters: list[dict], n_trials_max: int = 50,
                  restart: bool = False) -> None:
         # we assume that the parameters to optimize remain the same for all intervals
         for idx, i in enumerate(intervals):
@@ -72,15 +78,9 @@ class OptimizeSolverSettings:
         :param solver_dict: dict containing the solver settings to run the simulation with
         :return: dict containing the loss as a ratio between execution time with the current settings and the baseline
         """
-        # determine execution time for the baseline case
-        dt_base = self._compute_elapsed_time(join(self._executer.run_directory, "base"))
-
-        # instantiate parser for manipulating the solver settings, assume all copies have the same settings
-        parser = ManipulateSolverSettings(self._executer.run_directory)
-
-        # update dict for all copies
+        # update dict for all copies; we need to make a deepcopy, because the solver dicts are reset when updated
         for no in range(self._buffer_size):
-            parser.replace_settings(solver_dict[no], f"copy_{no}")
+            self._parser.replace_settings(deepcopy(solver_dict[no]), f"copy_{no}")
 
         # execute the simulations in the copy_* directories with the new settings
         self._executer.execute()
@@ -89,7 +89,7 @@ class OptimizeSolverSettings:
         dt_copies = [self._compute_elapsed_time(join(self._executer.run_directory, f"copy_{i}")) for i in
                      range(self._buffer_size)]
 
-        return {"loss": tuple([i / dt_base for i in dt_copies])}
+        return {"loss": tuple([i / self._dt_base for i in dt_copies])}
 
     def _execute_optimization(self, parameters: list[dict], i: tuple, n_trials_max: int = 50,
                               restart: bool = False) -> None:
@@ -112,16 +112,24 @@ class OptimizeSolverSettings:
             # ax.load_from_json_file(join(executer.run_directory, f"client_interval_{i[0]}_to_{i[1]}.json"))
 
         else:
-            # TODO: how determine convergence? -> early_stopping as kwarg -> usage?
-            self._ax.create_experiment(name="experiment", parameters=parameters,
+            # test early stopping, only sensible when buffer_size > 2
+            # stopping = PercentileEarlyStoppingStrategy(percentile_threshold=70, min_progression=0.3, min_curves=2,
+            #                                            trial_indices_to_ignore=[0], seconds_between_polls=1,
+            #                                            normalize_progressions=True)
+
+            self._ax.create_experiment(name="experiment", parameters=parameters, overwrite_existing_experiment=True,
                                        objectives={"loss": ObjectiveProperties(minimize=True)})
 
         # execute the optimization loop
+        """
+        we get N_buffer results for each setting we test -> Ax determines the uncertainty for executing the same 
+        parameters multiple times. So not sure how we can test multiple parameters in parallel...
+        """
         for _ in range(n_trials_max):
-            # TODO: how to sample N_buffer different settings for each runner?
             next_parameters, trial_index = self._ax.get_next_trial()
 
-            # replace solver dict settings with new settings
+            # replace solver dict settings with new settings (currently the same settings for all copies, see comment
+            # above)
             all_solver_dicts = []
             for _ in range(self._buffer_size):
                 for key, value in next_parameters.items():
@@ -129,14 +137,16 @@ class OptimizeSolverSettings:
                 all_solver_dicts.append(self._solver_dict)
 
             loss = self._run_trial(all_solver_dicts)
-            # TODO: sequential doesn't work with tuple of len 1, so unpack
-            self._ax.complete_trial(trial_index=trial_index, raw_data={"loss": loss["loss"][0]})
+            if self._buffer_size > 1:
+                self._ax.complete_trial(trial_index=trial_index, raw_data=loss)
+            else:
+                self._ax.complete_trial(trial_index=trial_index, raw_data={"loss": loss["loss"][0]})
 
             # save optimization results for each interval, save() raises NotImplementedError
             self._ax.save_to_json_file(join(self._executer.run_directory, f"client_interval_{i[0]}_to_{i[1]}.json"))
 
         # print some output
-        logger.info(f"\nOptimal parameters for interval {i}:", self._ax.get_best_parameters(), "\n")
+        logger.info(f"\nOptimal parameters for interval {i}: {self._ax.get_best_parameters()} \n")
 
 
 if __name__ == "__main__":
