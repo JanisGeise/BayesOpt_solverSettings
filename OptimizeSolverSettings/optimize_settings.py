@@ -30,13 +30,9 @@ class OptimizeSolverSettings:
         self._parser = ManipulateSolverSettings(self._executer.run_directory)
         self._gamg_settings = GAMGSolverOptions()
         self._solver_dict = self._gamg_settings.create_default_dict()
-        self._dt_base = None
 
     def prepare(self):
         self._executer.prepare()
-
-        # determine execution time for the baseline case
-        self._dt_base = self._compute_elapsed_time(join(self._executer.run_directory, "base"))
 
     def optimize(self, intervals: list[tuple], parameters: list[dict], n_trials_max: int = 50,
                  restart: bool = False) -> None:
@@ -78,6 +74,9 @@ class OptimizeSolverSettings:
         :param solver_dict: dict containing the solver settings to run the simulation with
         :return: dict containing the loss as a ratio between execution time with the current settings and the baseline
         """
+        # determine execution time for the baseline case
+        dt_base = self._compute_elapsed_time(join(self._executer.run_directory, "base"))
+
         # update dict for all copies; we need to make a deepcopy, because the solver dicts are reset when updated
         for no in range(self._buffer_size):
             self._parser.replace_settings(deepcopy(solver_dict[no]), f"copy_{no}")
@@ -89,7 +88,7 @@ class OptimizeSolverSettings:
         dt_copies = [self._compute_elapsed_time(join(self._executer.run_directory, f"copy_{i}")) for i in
                      range(self._buffer_size)]
 
-        return {"loss": tuple([i / self._dt_base for i in dt_copies])}
+        return {"loss": tuple([i / dt_base for i in dt_copies])}
 
     def _execute_optimization(self, parameters: list[dict], i: tuple, n_trials_max: int = 50,
                               restart: bool = False) -> None:
