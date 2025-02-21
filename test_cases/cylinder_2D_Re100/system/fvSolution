@@ -19,10 +19,30 @@ solvers
 {
     p
     {
-        solver           GAMG;
-        smoother         DICGaussSeidel;
-        tolerance        1e-06;
-        relTol           0.01;
+        solver                    GAMG;
+        smoother                  !smoother!;
+        tolerance                 !tolerance!;
+        relTol                    !relTol!;
+        cacheAgglomeration        !cacheAgglomeration!;
+        nCellsInCoarsestLevel     !nCellsInCoarsestLevel!;
+        processorAgglomerator     !processorAgglomerator!;
+        nPreSweeps                !nPreSweeps!;
+        preSweepsLevelMultiplier  !preSweepsLevelMultiplier!;
+        maxPreSweeps              !maxPreSweeps!;
+        nPostSweeps               !nPostSweeps!;
+        postSweepsLevelMultiplier !postSweepsLevelMultiplier!;
+        maxPostSweeps             !maxPostSweeps!;
+        nFinestSweeps             !nFinestSweeps!;
+        interpolateCorrection     !interpolateCorrection!;
+        scaleCorrection           !scaleCorrection!;
+        directSolveCoarsest       !directSolveCoarsest!;
+        coarsestLevelCorr
+        {
+            solver          !solverCoarsest!;
+            preconditioner  !preconditionerCoarsest!;
+            tolerance       !toleranceCoarsest!;
+            relTol          !relTolCoarsest!;
+        }
     }
 
     pFinal
@@ -70,7 +90,7 @@ PIMPLE
         "(U|p)"
         {
             relTol          0;
-            tolerance       1e-04;
+            tolerance       1e-05;
         }
     }
 }

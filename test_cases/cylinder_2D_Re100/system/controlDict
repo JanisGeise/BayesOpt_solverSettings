@@ -17,19 +17,19 @@ FoamFile
 
 application     pimpleFoam;
 
-startFrom       latestTime;
+startFrom       startTime;
 
-startTime       0;
+startTime       !startTime!;
 
 stopAt          endTime;
 
-endTime         6;
+endTime         !endTime!;
 
-deltaT          2.0e-3;
+deltaT          !deltaT!;
 
 writeControl    runTime;
 
-writeInterval   0.1;
+writeInterval   !writeInterval!;
 
 purgeWrite      0;
 
@@ -45,30 +45,6 @@ runTimeModifiable false;
 
 functions
 {
-    forces
-    {
-        type             forceCoeffs;
-        libs             (forces);
-        executeControl   writeTime;
-        executeInterval  1;
-        writeControl     writeTime;
-        writeInterval    1;
-        log false;
-        patches
-        (
-            cylinder
-        );
-        rhoInf      1;
-        rho         rhoInf;
-        CofR        (0.2 0.2 0.005);
-        liftDir     (0 1 0);
-        dragDir     (1 0 0);
-        pitchAxis   (0 0 1);
-        magUInf     1.0;
-        lRef        0.1;
-        Aref        0.001;
-    }
-
     time
     {
         type            timeInfo;

@@ -25,11 +25,11 @@ radiusOut #eval{ 3 * $radiusIn };
 sin45RIn #eval{ sqrt(2)/2 * $radiusIn };
 sin45ROut #eval{ sqrt(2)/2 * $radiusOut };
 // modify these values to refine the mesh
-blocksInR 30;
-blocksOutR 15;
-blocksCirc 25;
-blocksWake 100;
-blocksInlet 10;
+blocksInR 60;
+blocksOutR 30;
+blocksCirc 50;
+blocksWake 200;
+blocksInlet 20;
 //
 gradIn 0.1;
 gradWake 4.0;
