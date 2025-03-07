@@ -3,7 +3,6 @@ bopt
 /test_optimization/
 /run/
 /test_venv/
-/test_cases/
 __pycache__
 .vscode
 .ipynb_checkpoints
