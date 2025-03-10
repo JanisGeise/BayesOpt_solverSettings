@@ -1,0 +1,75 @@
+simulation:
+  base_case: "test_cases/cylinder_2D_Re100"
+  startTime: 0
+  duration: 6
+  writeInterval: 0.5
+  deltaT: 1.0e-3
+  gamg:
+    smoother: "DICGaussSeidel"
+    tolerance: 1e-06
+    relTol: 0.01
+    cacheAgglomeration: "yes"
+    nCellsInCoarsestLevel: 10
+    processorAgglomerator: "none"
+    nPreSweeps: 0
+    preSweepsLevelMultiplier: 1
+    maxPreSweeps: 10
+    nPostSweeps: 2
+    postSweepsLevelMultiplier: 1
+    maxPostSweeps: 10
+    nFinestSweeps: 2
+    interpolateCorrection: "no"
+    scaleCorrection: "yes"
+    directSolveCoarsest: "no"
+    solverCoarsest: "PCG"
+    preconditionerCoarsest: "DIC"
+    toleranceCoarsest: 1e-06
+    relTolCoarsest: 0.01
+
+experiment:
+  name: "cylinder2D-2"
+  exp_path: "run/cylinder2D-2"
+  launcher: "local"
+
+optimization:
+  startTime: [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]
+  duration: 0.05
+  writeInterval: 1
+  deltaT: 1.0e-3
+  sobol_trials: 10
+  bo_trials: 40
+  batch_size: 1
+  bad_value: 10
+  seed: 0
+  device: "cpu"
+  gamg:
+    smoother:
+      name: "smoother"
+      type: "choice"
+      value_type: "str"
+      is_ordered: False
+      sort_values: False
+      values: ["FDIC", "DIC", "DICGaussSeidel", "symGaussSeidel", "nonBlockingGaussSeidel", "GaussSeidel"]
+    interpolateCorrection:
+      name: "interpolateCorrection"
+      type: "choice"
+      value_type: "str"
+      is_ordered: False
+      sort_values: False
+      values: ["yes", "no"]
+    nPreSweeps:
+      name: "nPreSweeps"
+      type: "range"
+      value_type: "int"
+      bounds: [0, 10]
+    nPostSweeps:
+      name: "nPostSweeps"
+      type: "range"
+      value_type: "int"
+      bounds: [0, 10]
+    nFinestSweeps:
+      name: "nFinestSweeps"
+      type: "range"
+      value_type: "int"
+      bounds: [1, 10]
+

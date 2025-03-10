@@ -10,7 +10,7 @@ from ax.modelbridge.registry import Models
 from ax.service.utils.instantiation import ObjectiveProperties
 from ax.utils.common.logger import get_logger
 from ax.storage.json_store.save import save_experiment
-from execution import run_parameter_variation
+from execution import run_parameter_variation, batch_settings_from_config
 
 
 # load settings
@@ -30,7 +30,7 @@ sim_config = config["simulation"]
 base_case_path = sim_config["base_case"]
 base_name = base_case_path.split("/")[-1]
 rs = exp.create_run_settings(exe="bash", exe_args="Allrun.pre")
-bs = None
+bs = batch_settings_from_config(exp, config.get("batch_settings"))
 if not isdir(join(exp.exp_path, "base_sim")):
     base_sim = exp.create_model(
         "base_sim",

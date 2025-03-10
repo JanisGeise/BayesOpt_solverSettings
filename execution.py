@@ -7,6 +7,7 @@ from typing import Dict, Union
 from copy import deepcopy
 from collections import defaultdict
 from smartsim import Experiment
+from smartsim.settings.base import BatchSettings
 from smartsim.entity import Model
 import numpy as np
 from pandas import read_csv
@@ -49,6 +50,16 @@ def extract_runtime(
             return (t_cum[-1] - t_cum[0]) / (len(t_cum) - 1)
     except:
         return bad_value
+    
+
+def batch_settings_from_config(exp: Experiment, batch_config: dict) -> Union[BatchSettings, None]:
+    if batch_config is not None:
+        bs = exp.create_batch_settings(batch_args=batch_config.get("batch_args"))
+        if "preamble" in batch_config:
+            bs.add_preamble(batch_config["preamble"])
+    else:
+        bs = None
+    return bs
 
 
 def run_parameter_variation(
@@ -56,7 +67,7 @@ def run_parameter_variation(
 ) -> Dict[int, float]:
     opt_config = config["optimization"]
     rs = exp.create_run_settings(exe="bash", exe_args="Allrun.solve")
-    bs = None
+    bs = batch_settings_from_config(exp, config.get("batch_settings"))
     path = join(exp.exp_path, "base_sim", "processor0")
     startTime = find_closest_time(path, opt_config["startTime"][time_idx])
     endTime = float(startTime) + opt_config["duration"]
