@@ -69,12 +69,13 @@ For more details on the HPC system, refer to the documentation:
 
 ### Running an optimization
 
-The driver script has to be started via a *jobscirpt*. A suitable jobscript looks as follows:
+The driver script has to be started via a *jobscirpt*. A suitable jobscript looks as follows (don't forget to substitute the mail address):
 ```
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --time=08:00:00
+#SBATCH --job-name=gamg_opt
 #SBATCH --mail-type=start,end
 #SBATCH --mail-user=<your.email>@tu-dresden.de
 
@@ -86,6 +87,7 @@ To submit the job, run:
 ```
 sbatch jobscript
 ```
+The resources required for running a simulation are specified in *batch_settings* of the general configuration file (refer to *example_config_slurm.yaml*).
 
 ## Test case
 
