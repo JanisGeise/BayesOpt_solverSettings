@@ -33,6 +33,17 @@ python3 run.py example_config_local.yaml &> log.example_run
 
 The script *eval_runs.py* contains a rudimentary example for visualizing the outcome.
 
+### Repeated runs
+
+To quantify the uncertainty of the computational environment, it is sensible to repeat
+simulations multiple times with unchanged settings:
+
+```
+source bopt/bin/activate
+python3 run_repeated.py example_config_repeated_local.yaml &> log.example_run
+```
+The scripts outputs the elapsed time to a *timing_int_\*.csv* file in the experiment folder.
+
 ## Getting started - cluster execution
 
 ### Allocating a workspace
