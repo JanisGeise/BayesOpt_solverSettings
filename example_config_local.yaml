@@ -42,6 +42,10 @@ optimization:
   bad_value: 10
   seed: 0
   device: "cpu"
+  stopping:
+    min_trials: 20
+    window_size: 5
+    improvement_bar: 0.01
   gamg:
     smoother:
       name: "smoother"

@@ -8,6 +8,7 @@ from ax.service.ax_client import AxClient
 from ax.modelbridge.generation_strategy import GenerationStrategy, GenerationStep
 from ax.modelbridge.registry import Models
 from ax.service.utils.instantiation import ObjectiveProperties
+from ax.global_stopping.strategies.improvement import ImprovementGlobalStoppingStrategy
 from ax.utils.common.logger import get_logger
 from ax.storage.json_store.save import save_experiment
 from execution import run_parameter_variation, batch_settings_from_config
@@ -66,7 +67,12 @@ for i, startTime in enumerate(opt_config["startTime"]):
             ),
         ]
     )
-    ax_client = AxClient(random_seed=opt_config["seed"], generation_strategy=gs)
+    stopping_strategy = ImprovementGlobalStoppingStrategy(**opt_config["stopping"])
+    ax_client = AxClient(
+        random_seed=opt_config["seed"],
+        generation_strategy=gs,
+        global_stopping_strategy=stopping_strategy
+    )
     ax_client.create_experiment(
         name=f"{config['experiment']['name']}-ax-{i}",
         parameters=list(opt_config["gamg"].values()),
@@ -83,11 +89,14 @@ for i, startTime in enumerate(opt_config["startTime"]):
     ax_client.complete_trial(trial_index=idx, raw_data={"execution_time" : obj})
     while not (complete_sobol and complete_bo):
         trials, complete = ax_client.get_next_trials(opt_config["batch_size"])
+        if not trials:
+            complete, complete_sobol, complete_bo = True, True, True
         if complete and not complete_sobol:
             complete_sobol = True
             complete = False
-        complete_bo = complete and complete_sobol
+            complete_bo = complete and complete_sobol
         if not complete:
+            logger.info("running parameter variation again")
             results = run_parameter_variation(exp=exp, trials=trials, config=config, time_idx=i)
             for idx, obj in results.items():
                 ax_client.complete_trial(trial_index=idx, raw_data={"execution_time" : obj})
