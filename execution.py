@@ -6,6 +6,7 @@ from os.path import isdir, join
 from typing import Dict, Union
 from copy import deepcopy
 from collections import defaultdict
+from math import sqrt
 from smartsim import Experiment
 from smartsim.settings.base import BatchSettings
 from smartsim.entity import Model
@@ -88,25 +89,45 @@ def run_parameter_variation(
     params = defaultdict(list)
     for d in params_full:
         for key, val in d.items():
-            params[key].append(val)
+            params[key].extend([val] * opt_config["n_repeat_trials"])
     keys_str = [str(key) for key in trials.keys()]
     ens = exp.create_ensemble(
         name=f"int_{time_idx}_trial_{'_'.join(keys_str)}",
         params=params,
         perm_strategy="step",
         run_settings=rs,
-        batch_settings=bs,
+        batch_settings=bs
     )
     base_case_path = config["simulation"]["base_case"]
     ens.attach_generator_files(to_configure=base_case_path)
     exp.generate(ens, overwrite=True, tag="!")
-    exp.start(ens, block=True)
-    return {
-        key: extract_runtime(
+    if opt_config["repeated_trials_parallel"]:
+        exp.start(ens, block=True)
+    else:
+        n_parallel = opt_config["batch_size"]
+        for i in range(0, len(ens.models), n_parallel):
+            ens_batch = ens.models[i:i+n_parallel]
+            exp.start(*ens_batch, block=True)
+    runtimes = [
+        extract_runtime(
             model,
             startTime,
             int(float(opt_config["duration"]) / float(opt_config["deltaT"])),
             opt_config["bad_value"],
         )
-        for key, model in zip(trials.keys(), ens.models)
-    }
+        for model in ens.models
+    ]
+    nr = opt_config["n_repeat_trials"]
+    if nr > 1:
+        stats = [
+            (np.mean(runtimes[i:i+nr]), np.std(runtimes[i:i+nr]) / sqrt(nr))
+            for i in range(0, len(runtimes), nr)
+        ]
+        obj = {
+            key : stat_i for key, stat_i in zip(trials.keys(), stats)
+        }
+    else:
+        obj = {
+            key : (t_i, 0.0) for key, t_i in zip(trials.keys(), runtimes)
+        }
+    return obj

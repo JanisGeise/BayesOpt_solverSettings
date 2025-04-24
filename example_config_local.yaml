@@ -39,6 +39,8 @@ optimization:
   sobol_trials: 10
   bo_trials: 40
   batch_size: 1
+  n_repeat_trials: 5
+  repeated_trials_parallel: False
   bad_value: 10
   seed: 0
   device: "cpu"
