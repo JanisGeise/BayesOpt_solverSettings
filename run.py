@@ -1,6 +1,7 @@
 import sys
 from os import makedirs
 from os.path import isdir, join
+from math import log10
 from logging import INFO
 from yaml import safe_load
 from smartsim import Experiment
@@ -11,7 +12,7 @@ from ax.service.utils.instantiation import ObjectiveProperties
 from ax.global_stopping.strategies.improvement import ImprovementGlobalStoppingStrategy
 from ax.utils.common.logger import get_logger
 from ax.storage.json_store.save import save_experiment
-from execution import run_parameter_variation, batch_settings_from_config
+from execution import run_parameter_variation, batch_settings_from_config, LOG10_KEYS
 
 
 # load settings
@@ -82,9 +83,11 @@ for i, startTime in enumerate(opt_config["startTime"]):
 
     complete_bo = False
     complete_sobol = False
-    trial, idx = ax_client.attach_trial(
-        {key : sim_config["gamg"][key] for key in opt_config["gamg"].keys()}
-    )
+    default_trial = {
+        key : (log10(float(sim_config["gamg"][key])) if key in LOG10_KEYS else sim_config["gamg"][key])
+        for key in opt_config["gamg"].keys()
+    }
+    trial, idx = ax_client.attach_trial(default_trial)
     idx, obj = list(run_parameter_variation(exp=exp, trials={idx : trial}, config=config, time_idx=i).items())[0]
     ax_client.complete_trial(trial_index=idx, raw_data={"execution_time" : obj})
     while not (complete_sobol and complete_bo):
