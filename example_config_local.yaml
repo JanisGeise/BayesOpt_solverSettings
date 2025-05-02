@@ -78,4 +78,14 @@ optimization:
       type: "range"
       value_type: "int"
       bounds: [1, 10]
+    tolerance:
+      name: "tolerance"
+      type: "range"
+      value_type: "float"
+      bounds: [-9, -6] # log10 space
+    relTol:
+      name: "relTol"
+      type: "range"
+      value_type: "float"
+      bounds: [-3, -1] # log10 space
 

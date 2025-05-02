@@ -14,6 +14,9 @@ import numpy as np
 from pandas import read_csv
 
 
+LOG10_KEYS = ("tolerance", "relTol", "toleranceCoarsest", "relTolCoarsest")
+
+
 def is_float(value: str) -> bool:
     try:
         _ = float(value)
@@ -83,7 +86,10 @@ def run_parameter_variation(
     for key in trials.keys():
         default = deepcopy(config["simulation"]["gamg"])
         for key_i, val_i in trials[key].items():
-            default[key_i] = val_i
+            if key_i in LOG10_KEYS:
+                default[key_i] = 10**val_i
+            else:
+                default[key_i] = val_i
         gamg_params[key] = default
     params_full = [sim_params | gamg_params[key] for key in gamg_params.keys()]
     params = defaultdict(list)
