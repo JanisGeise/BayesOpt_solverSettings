@@ -1,0 +1,20 @@
+#!/bin/bash
+cd "$(dirname "$(realpath "$0")")" || exit
+. "${WM_PROJECT_DIR:?}"/bin/tools/RunFunctions
+#------------------------------------------------------------------------------
+
+# mesh creation
+runApplication blockMesh
+runApplication checkMesh -allGeometry -allTopology
+
+# set inlet velocity
+cp -r 0.org 0
+runApplication setExprBoundaryFields
+
+# parallel run
+runApplication decomposePar
+runParallel renumberMesh -overwrite
+runParallel potentialFoam -writephi
+runParallel $(getApplication)
+
+#------------------------------------------------------------------------------
