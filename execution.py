@@ -113,6 +113,8 @@ def run_parameter_variation(
         n_parallel = opt_config["batch_size"]
         for i in range(0, len(ens.models), n_parallel):
             ens_batch = ens.models[i:i+n_parallel]
+            for model_i in ens_batch:
+                model_i.batch_settings = bs
             exp.start(*ens_batch, block=True)
     runtimes = [
         extract_runtime(
