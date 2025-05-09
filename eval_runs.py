@@ -13,7 +13,7 @@ from pandas import read_csv
 
 plt.style.use('dark_background')
 plt.rcParams.update({
-    "text.usetex": True
+    "text.usetex": False
 })
 
 # load settings
@@ -33,19 +33,21 @@ base_timing = read_csv(
     usecols=[0, 1],
     names=["t", "t_cpu_cum"],
 )
+print(base_timing.t.shape)
 t_plot = base_timing.t.values[49::50] - 0.05
+print(t_plot.shape)
 t_cum_plot = base_timing.t_cpu_cum.values[49::50]
-t_cum_plot = np.concatenate((t_cum_plot[:1], t_cum_plot[1:]-t_cum_plot[:-1]))
+t_cum_plot = np.concatenate((t_cum_plot[:1], t_cum_plot[1:]-t_cum_plot[:-1]))/50
 fig, ax = plt.subplots(figsize=(6, 2.5))
 ax.bar(t_plot, t_cum_plot, width=0.05*0.9, align="center")
 ax.set_xlim(0, 6)
-ax.set_ylim(0, 20)
 ax.set_xlabel(r"$\tilde{t}$")
 ax.set_ylabel(r"$T_{50\Delta t}$")
 
 
 for i, st_i in enumerate(config["optimization"]["startTime"][:]):
     ax_client = AxClient().load_from_json_file(join(f"{config['experiment']['exp_path']}", f"ax_client_int_{i}.json"))
+
     data = ax_client.experiment.fetch_data().df["mean"].values
     if i==0:
       ax.scatter([float(st_i)]*len(data), data, marker="x", s=10, c="C3", label="trials", linewidth=0.5, alpha=0.5)
