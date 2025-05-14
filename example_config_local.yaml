@@ -1,7 +1,7 @@
 simulation:
   base_case: "test_cases/cylinder_2D_Re100"
   startTime: 0
-  duration: 6
+  duration: 0.1
   writeInterval: 0.5
   deltaT: 1.0e-3
   gamg:
@@ -33,11 +33,11 @@ experiment:
 
 optimization:
   startTime: [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]
-  duration: 0.05
+  duration: 0.01
   writeInterval: 1
   deltaT: 1.0e-3
-  sobol_trials: 10
-  bo_trials: 40
+  sobol_trials: 1
+  bo_trials: 1
   batch_size: 1
   n_repeat_trials: 5
   repeated_trials_parallel: False
@@ -45,7 +45,7 @@ optimization:
   seed: 0
   device: "cpu"
   stopping:
-    min_trials: 20
+    min_trials: 1
     window_size: 5
     improvement_bar: 0.01
   gamg:
