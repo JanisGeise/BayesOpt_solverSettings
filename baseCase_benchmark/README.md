@@ -2,6 +2,8 @@
 
 This folder contains the files necesarry to carry out the benchmark to account for the uncertainty in execution time of the Openfoam simulation of Flow across cylinder. This is done to account for the changes in execution times within the same hardware.
 
+## Simulation setup
+The openfoam files for the required simulation to benchmark, must be placed in a folder called "base_sim". The Allrun should be named "Allrun.pre". This folder name and script name can be changed, but corresponding changes need to be made in the jobscript files.
 ## Benchmarking - Cluster
 The following steps are followed for benchmarking on the cluster:
 
