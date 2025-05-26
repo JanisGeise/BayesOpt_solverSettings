@@ -88,4 +88,53 @@ optimization:
       type: "range"
       value_type: "float"
       bounds: [-3, -1] # log10 space
-
+    nCellsInCoarsestLevel:
+      name: "nCellsInCoarsestLevel"
+      type: "range"
+      value_type: "int"
+      bounds: [2, 1000]
+    toleranceCoarsest:
+      name: "toleranceCoarsest"
+      type: "range"
+      value_type: "float"
+      bounds: [-8, -2] # log10 space
+    relTolCoarsest:
+      name: "relTolCoarsest"
+      type: "range"
+      value_type: "float"
+      bounds: [-5, -2] # log10 space
+evaluation:
+  output_path: "output"
+  data_path: "run/cylinder2D-2"
+  plots:
+    trialVsBase:
+      isReq: True
+    bestParams: 
+      isReq: True
+      plotScope:
+        type: "all" # "selected or all"
+        selectedParams: ["smoother", "nPostSweeps"] # required if type == "selected"
+    trialVsObj:
+      isReq: True
+    gaussianProcess:
+      isReq: True
+      plotScope:
+        type: "all" #  "selected or all"
+        selectedParams: ["smoother", "nPostSweeps"] # required if type == "selected"
+      param_setting:
+        type: "optimal" #  "optimal or fixed"
+        fixed_values: # required if type == "fixed"
+          smoother: "FDIC"
+          interpolateCorrection: "yes"
+          nPreSweeps: 2
+          nPostSweeps: 4
+          nFinestSweeps: 1
+          nCellsInCoarsestLevel: 10
+          toleranceCoarsest: -6
+          relTolCoarsest: -2
+    featureImportance:
+        isReq: True
+    crossValidation:
+        isReq: True  
+  plot_attributes:
+    style_sheet: "classic" # "dark_background, classic or any other from matplotlib"

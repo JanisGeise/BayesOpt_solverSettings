@@ -40,21 +40,21 @@ batch_settings:
   preamble: ["module load release/24.04 GCC/12.3.0 OpenMPI/4.1.5 OpenFOAM/v2406", "source $FOAM_BASH"]
 
 optimization:
-  startTime: [0, 3.0, 5.0]
+  startTime: [ 1.0, 3.0, 5.0]
   duration: 0.05
   writeInterval: 1
   deltaT: 1.0e-3
   sobol_trials: 10
-  bo_trials: 40
+  bo_trials: 70
   batch_size: 1
-  n_repeat_trials: 5
-  repeated_trials_parallel: False
+  n_repeat_trials: 10
+  repeated_trials_parallel: True
   bad_value: 10
   seed: 0
   device: "cpu"
   stopping:
-    min_trials: 20
-    window_size: 5
+    min_trials: 30
+    window_size: 10 
     improvement_bar: 0.01
   gamg:
     smoother:
@@ -86,14 +86,53 @@ optimization:
       type: "range"
       value_type: "int"
       bounds: [1, 10]
-    tolerance:
-      name: "tolerance"
+    nCellsInCoarsestLevel:
+      name: "nCellsInCoarsestLevel"
+      type: "range"
+      value_type: "int"
+      bounds: [2, 1000]
+    toleranceCoarsest:
+      name: "toleranceCoarsest"
       type: "range"
       value_type: "float"
-      bounds: [-9, -6] # log10 space
-    relTol:
-      name: "relTol"
+      bounds: [-8, -2] # log10 space
+    relTolCoarsest:
+      name: "relTolCoarsest"
       type: "range"
       value_type: "float"
-      bounds: [-3, -1] # log10 space
-
+      bounds: [-5, -2] # log10 space
+evaluation:
+  output_path: "output"
+  data_path: "run/cylinder2D-2"
+  plots:
+    trialVsBase:
+      isReq: True
+    bestParams: 
+      isReq: True
+      plotScope:
+        type: "all" # "selected or all"
+        selectedParams: ["smoother", "nPostSweeps"] # required if type == "selected"
+    trialVsObj:
+      isReq: True
+    gaussianProcess:
+      isReq: True
+      plotScope:
+        type: "all" #  "selected or all"
+        selectedParams: ["smoother", "nPostSweeps"] # required if type == "selected"
+      param_setting:
+        type: "optimal" #  "optimal or fixed"
+        fixed_values: # required if type == "fixed"
+          smoother: "FDIC"
+          interpolateCorrection: "yes"
+          nPreSweeps: 2
+          nPostSweeps: 4
+          nFinestSweeps: 1
+          nCellsInCoarsestLevel: 10
+          toleranceCoarsest: -6
+          relTolCoarsest: -2
+    featureImportance:
+        isReq: True
+    crossValidation:
+        isReq: True  
+  plot_attributes:
+    style_sheet: "classic" # "dark_background, classic or any other from matplotlib"
