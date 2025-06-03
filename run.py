@@ -5,6 +5,7 @@ from math import log10
 from logging import INFO
 from yaml import safe_load
 from smartsim import Experiment
+from smartsim.settings import RunSettings
 from ax.service.ax_client import AxClient
 from ax.modelbridge.generation_strategy import GenerationStrategy, GenerationStep
 from ax.modelbridge.registry import Models
@@ -31,7 +32,7 @@ exp = Experiment(**config["experiment"])
 sim_config = config["simulation"]
 base_case_path = sim_config["base_case"]
 base_name = base_case_path.split("/")[-1]
-rs = exp.create_run_settings(exe="bash", exe_args="Allrun.pre")
+rs = RunSettings("Allrun.pre")
 bs = batch_settings_from_config(exp, config.get("batch_settings"))
 if not isdir(join(exp.exp_path, "base_sim")):
     base_sim = exp.create_model(

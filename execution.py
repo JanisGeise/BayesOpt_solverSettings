@@ -8,6 +8,7 @@ from copy import deepcopy
 from collections import defaultdict
 from math import sqrt
 from smartsim import Experiment
+from smartsim.settings import RunSettings
 from smartsim.settings.base import BatchSettings
 from smartsim.entity import Model
 import numpy as np
@@ -70,7 +71,7 @@ def run_parameter_variation(
     exp: Experiment, trials: dict, config: dict, time_idx: int
 ) -> Dict[int, float]:
     opt_config = config["optimization"]
-    rs = exp.create_run_settings(exe="bash", exe_args="Allrun.solve")
+    rs = RunSettings("Allrun.solve")
     bs = batch_settings_from_config(exp, config.get("batch_settings"))
     path = join(exp.exp_path, "base_sim", "processor0")
     startTime = find_closest_time(path, opt_config["startTime"][time_idx])
