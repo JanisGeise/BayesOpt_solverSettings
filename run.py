@@ -7,15 +7,15 @@ from yaml import safe_load
 from smartsim import Experiment
 from smartsim.settings import RunSettings
 from ax.service.ax_client import AxClient
-from ax.modelbridge.generation_strategy import GenerationStrategy, GenerationStep
-from ax.modelbridge.registry import Models
+from ax.generation_strategy.generation_strategy import GenerationStrategy, GenerationStep
+from ax.modelbridge.registry import Generators
 from ax.service.utils.instantiation import ObjectiveProperties
 from ax.global_stopping.strategies.improvement import ImprovementGlobalStoppingStrategy
 from ax.utils.common.logger import get_logger
 from ax.storage.json_store.save import save_experiment
 from execution import run_parameter_variation, batch_settings_from_config, LOG10_KEYS
 
-
+Generators
 # load settings
 config_file = sys.argv[1] if len(sys.argv) > 1 else "config.yaml"
 try:
@@ -58,12 +58,12 @@ for i, startTime in enumerate(opt_config["startTime"]):
     gs = GenerationStrategy(
         steps=[
             GenerationStep(
-                model=Models.SOBOL,
+                model=Generators.SOBOL,
                 num_trials=opt_config["sobol_trials"],
                 max_parallelism=opt_config["sobol_trials"],
             ),
             GenerationStep(
-                model=Models.BO_MIXED,
+                model=Generators.BO_MIXED,
                 num_trials=opt_config["bo_trials"],
                 max_parallelism=opt_config["batch_size"],
             ),
