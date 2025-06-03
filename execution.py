@@ -7,7 +7,9 @@ from typing import Dict, Union
 from copy import deepcopy
 from collections import defaultdict
 from math import sqrt
+from time import sleep
 from smartsim import Experiment
+from smartsim.settings import RunSettings
 from smartsim.settings.base import BatchSettings
 from smartsim.entity import Model
 import numpy as np
@@ -70,7 +72,7 @@ def run_parameter_variation(
     exp: Experiment, trials: dict, config: dict, time_idx: int
 ) -> Dict[int, float]:
     opt_config = config["optimization"]
-    rs = exp.create_run_settings(exe="bash", exe_args="Allrun.solve")
+    rs = RunSettings(exe="bash", exe_args="Allrun.solve")
     bs = batch_settings_from_config(exp, config.get("batch_settings"))
     path = join(exp.exp_path, "base_sim", "processor0")
     startTime = find_closest_time(path, opt_config["startTime"][time_idx])
@@ -108,14 +110,21 @@ def run_parameter_variation(
     ens.attach_generator_files(to_configure=base_case_path)
     exp.generate(ens, overwrite=True, tag="!")
     if opt_config["repeated_trials_parallel"]:
-        exp.start(ens, block=True)
+        n_parallel = opt_config["batch_size"] * opt_config["n_repeat_trials"]
+        for model_i in ens.models:
+            model_i.batch_settings = bs
+            exp.start(model_i, block=False)
+        while not all(exp.finished(model_i) for model_i in ens.models):
+            sleep(2)
     else:
         n_parallel = opt_config["batch_size"]
         for i in range(0, len(ens.models), n_parallel):
             ens_batch = ens.models[i:i+n_parallel]
             for model_i in ens_batch:
                 model_i.batch_settings = bs
-            exp.start(*ens_batch, block=True)
+                exp.start(model_i, block=False)
+            while not all(exp.finished(model_i) for model_i in ens_batch):
+                sleep(2)
     runtimes = [
         extract_runtime(
             model,

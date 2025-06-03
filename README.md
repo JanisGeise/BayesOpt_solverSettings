@@ -11,14 +11,14 @@ The basis of the project can be found in the repository
 
 The instructions and tests are tailored to:
 - OpenFOAM-v2406
-- Python 3.10
+- Python 3.11
 
 Newer versions might work as well but were not explicitly tested.
 
 To set up a suitable virtual environment, run:
 ```bash
 # repository top-level
-python3 -m venv bopt
+python3.11 -m venv bopt
 source bopt/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
@@ -28,7 +28,7 @@ pip install -r requirements.txt
 
 ```
 source bopt/bin/activate
-python3 run.py example_config_local.yaml &> log.example_run
+python run.py example_config_local.yaml &> log.example_run
 ```
 
 The script *eval_runs.py* contains a rudimentary example for visualizing the outcome.
@@ -40,7 +40,7 @@ simulations multiple times with unchanged settings:
 
 ```
 source bopt/bin/activate
-python3 run_repeated.py example_config_repeated_local.yaml &> log.example_run
+python run_repeated.py example_config_repeated_local.yaml &> log.example_run
 ```
 The scripts outputs the elapsed time to a *timing_int_\*.csv* file in the experiment folder.
 
@@ -67,7 +67,7 @@ cd BayesOpt_solverSettings
 To set up a suitable virtual environment, run:
 ```bash
 # repository top-level
-module load release/24.04 GCCcore/12.2.0 Python/3.10.8
+module load release/24.04 GCCcore/12.3.0 Python/3.11.3
 python -m venv bopt
 source bopt/bin/activate
 pip install --upgrade pip
@@ -90,7 +90,7 @@ The driver script has to be started via a *jobscirpt*. A suitable jobscript look
 #SBATCH --mail-type=start,end
 #SBATCH --mail-user=<your.email>@tu-dresden.de
 
-module load release/24.04 GCCcore/12.2.0 Python/3.10.8
+module load release/24.04 GCCcore/12.3.0 Python/3.11.3
 source bopt/bin/activate
 python run.py example_config_slurm.yaml &> log.example_run
 ```
