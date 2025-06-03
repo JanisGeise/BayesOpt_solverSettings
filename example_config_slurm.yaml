@@ -37,7 +37,7 @@ batch_settings:
     time: "00:30:00"
     ntasks: 2
     partition: "barnard"
-  preamble: ["module load release/24.04 GCC/12.3.0 OpenMPI/4.1.5 OpenFOAM/v2406", "source $FOAM_BASH"]
+  preamble: ["module load release/24.04 GCC/12.3.0 OpenMPI/4.1.5 OpenFOAM/v2406 Python/3.11.3", "source $FOAM_BASH", "source /path/to/bopt/bin/activate"]
 
 optimization:
   startTime: [ 1.0, 3.0, 5.0]
