@@ -103,7 +103,7 @@ optimization:
       bounds: [-5, -2] # log10 space
 evaluation:
   output_path: "output"
-  data_path: "run/cylinder2D-2"
+  benchmark_path: "benchmark_time_info"
   plots:
     trialVsBase:
       isReq: True
@@ -120,7 +120,7 @@ evaluation:
         type: "all" #  "selected or all"
         selectedParams: ["smoother", "nPostSweeps"] # required if type == "selected"
       param_setting:
-        type: "optimal" #  "optimal or fixed"
+        type: "marginalization" #  "optimal, fixed or marginalization"
         fixed_values: # required if type == "fixed"
           smoother: "FDIC"
           interpolateCorrection: "yes"

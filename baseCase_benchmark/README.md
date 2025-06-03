@@ -26,7 +26,12 @@ The following steps are followed for benchmarking on the local machine:
 bash localBenchmark_script.sh
 ```
 ## Plotting
-The simulation files are stored in a folder called "openfoam_cases". To Visulize this data use the "plot.py" file. 
+The simulation files are stored in a folder called "openfoam_cases". To Visualize this data use the "plot.py" file. 
 ```bash
 python3 plot.py
+```
+## Data generation
+The execution time data of the benchmark cases is required for the post processing of BO run, which is done using the "eval_runs.py" script. To extract this data in the required structure, use the "copy_data.sh" script. A new folder called "benchmark_time_info" is created, where the required data is stored. 
+```bash
+bash copy_data.sh
 ```

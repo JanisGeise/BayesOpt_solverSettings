@@ -2,107 +2,203 @@ import sys
 from os.path import join
 from yaml import safe_load
 from ax.service.ax_client import AxClient
-from ax.modelbridge.registry import Models
-from ax.plot.contour import interact_contour_plotly, interact_contour
-from ax.utils.report.render import render_report_elements
-from ax.plot.render import plot_config_to_html
-from ax.plot.render import plotly_offline
 import numpy as np
 import matplotlib.pyplot as plt
-from pandas import read_csv
-from os import makedirs, getcwd
-import pandas as pd
+from pandas import read_csv, DataFrame
+from os import makedirs
 from ax.core.observation import ObservationFeatures
 from ax.modelbridge.registry import Generators
-import pickle
 from ax.modelbridge.base import ObservationFeatures
 from copy import deepcopy
 from ax.core.parameter import ChoiceParameter, RangeParameter
-from ax.plot.diagnostic import interact_cross_validation
 from ax.modelbridge.cross_validation import cross_validate
+import os
+
 
 def plot_trial_vs_base(config, ax_clients):
+    """
+    Plot base-case execution time vs. optimization trial results.
 
-    with open("benchmark_data.pkl", "rb") as f:
-        data_li = pickle.load(f)
+    This function compares cumulative CPU execution times from a set of
+    baseline simulations to execution times from trials run during a
+    Bayesian optimization loop. The base data is summarized with a bar
+    plot and boxplot, while trial performance is plotted as scatter points.
 
-    dur = float(config['optimization']['duration'])
-    step = int(dur/float(config['optimization']['deltaT']))
+    Parameters
+    ----------
+    config : dict
+        Same configuration dictionary used for the Bayesian optimization run,
+        which also contains the settings for evaluation. It must include keys
+        like:
+            - evaluation.benchmark_path : Path to base-case run folders.
+            - evaluation.output_path : Directory to save the generated plot.
+    ax_clients : list of AxClient
+        List of AxClient instances, each representing optimization runs for
+        different intervals.
+
+    Returns
+    -------
+    None
+        This function saves the plot to folder named "trial_vs_base" in the
+        output directory and does not return any value.
+    """
+    if "benchmark_path" not in config.get("evaluation", {}):
+        raise KeyError("Missing benchmark_path")
+    fol = config["evaluation"]["benchmark_path"]
+    folder = os.listdir(fol)
+    data_li = []
+    for file in folder:
+        base_timing = read_csv(
+            os.path.join(fol, file),
+            header=None,
+            sep=r"\s+",
+            skiprows=1,
+            usecols=[0, 1],
+            names=["t", "t_cpu_cum"],
+        )
+        data_li.append(base_timing)
+    dur = float(config["optimization"]["duration"])
+    step = int(dur / float(config["optimization"]["deltaT"]))
     mean_li = []
     for base_timing in data_li:
-        t_plot = base_timing.t.values[step-1::step] - step*0.001
-        t_cum_plot = base_timing.t_cpu_cum.values[step-1::step]
-        t_cum_plot = np.concatenate((t_cum_plot[:1], t_cum_plot[1:]-t_cum_plot[:-1]))/step
+        t_plot = base_timing.t.values[step - 1 :: step] - step * 0.001
+        t_cum_plot = base_timing.t_cpu_cum.values[step - 1 :: step]
+        t_cum_plot = (
+            np.concatenate((t_cum_plot[:1], t_cum_plot[1:] - t_cum_plot[:-1])) / step
+        )
         mean_li.append(t_cum_plot)
 
     box_li = np.array(mean_li)
     mean_array = np.mean(np.stack(mean_li), axis=0)
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
-    x_centers = t_plot+step*0.001*0.9/2
-    selected_times = [x + step*0.001*0.9/2 for x in map(float,config["optimization"]["startTime"])]
-    flierprops = dict(marker='o', markersize=1, markerfacecolor='red', linestyle='none', markeredgecolor="red")
-    boxprops = dict(linewidth=0.5, color='black')
-    selected_indices = [i for i, t in enumerate(x_centers) if np.isclose(t, selected_times, atol=1e-6).any()]
+    x_centers = t_plot + step * 0.001 * 0.9 / 2
+    selected_times = [
+        x + step * 0.001 * 0.9 / 2
+        for x in map(float, config["optimization"]["startTime"])
+    ]
+    flierprops = dict(
+        marker="o",
+        markersize=1,
+        markerfacecolor="red",
+        linestyle="none",
+        markeredgecolor="red",
+    )
+    boxprops = dict(linewidth=0.5, color="black")
+    selected_indices = [
+        i
+        for i, t in enumerate(x_centers)
+        if np.isclose(t, selected_times, atol=1e-6).any()
+    ]
     filtered_box_li = box_li[:, selected_indices]
     filtered_x_centers = x_centers[selected_indices]
 
-    ax.boxplot(filtered_box_li, positions=filtered_x_centers, widths=step*0.001*0.9, patch_artist=False, flierprops=flierprops, boxprops=boxprops)
-    ax.bar(t_plot, mean_array, width=step*0.001*0.9, align="edge", color="skyblue")
+    ax.boxplot(
+        filtered_box_li,
+        positions=filtered_x_centers,
+        widths=step * 0.001 * 0.9,
+        patch_artist=False,
+        flierprops=flierprops,
+        boxprops=boxprops,
+    )
+
+    ax.bar(t_plot, mean_array, width=step * 0.001 * 0.9, align="edge", color="skyblue")
     ax.set_xlim(0, 6)
-    #ax.set_ylim(0, 0.25)
     ax.set_xlabel(r"$\tilde{t}$")
-    ax.set_ylabel(r"$T_{{{stept}\Delta t}}$".format(stept = step))
+    ax.set_ylabel(r"$T_{{{stept}\Delta t}}$".format(stept=step))
     ax.set_title("Execution time for base case - {} time steps".format(step))
     ax.set_xticks([1, 2, 3, 4, 5, 6])
-    
     ax.set_xticklabels([1, 2, 3, 4, 5, 6])
-
 
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
 
         data = ax_clients[i].experiment.fetch_data().df["mean"].values
-        if i==0:
-            ax.scatter([float(st_i)]*len(data), data, marker="x", s=10, c="red", label="trials", linewidth=0.5, alpha=0.5)
+        if i == 0:
+            ax.scatter(
+                [float(st_i)] * len(data),
+                data,
+                marker="x",
+                s=10,
+                c="red",
+                label="trials",
+                linewidth=0.5,
+                alpha=0.5,
+            )
         else:
-            ax.scatter([float(st_i)]*len(data), data, marker="x", s=10, c="red", linewidth=0.5, alpha=0.5)
+            ax.scatter(
+                [float(st_i)] * len(data),
+                data,
+                marker="x",
+                s=10,
+                c="red",
+                linewidth=0.5,
+                alpha=0.5,
+            )
     ax.legend()
     path = join(config["evaluation"]["output_path"], "trial_vs_base")
     makedirs(path, exist_ok=True)
-    fig.savefig(join(path, "execution_time_dt_opt.svg"), bbox_inches="tight", transparent=True)
+    fig.savefig(
+        join(path, "execution_time_dt_opt.svg"), bbox_inches="tight", transparent=True
+    )
     plt.close(fig)
 
+
 def plot_best_params(config, ax_clients):
+    """
+    Plot the best parameters across different optimization intervals.
+
+    This function extracts the best parameters obtained from Bayesian optimization
+    for each specified interval (start time), and generates line plots showing how
+    the best value of each parameter evolves with the interval. The user can choose
+    to plot only a subset of parameters through the configuration.
+
+    Parameters
+    ----------
+    config : dict
+        Same configuration dictionary used for the Bayesian optimization run,
+        which also contains the settings for evaluation. It must include keys
+        like:
+            - evaluation.output_path : Path to save the generated plots.
+            - evaluation.plots.best_params.plot_scope : Dict with keys:
+                - type : "all" or "selected"
+                - selected_params : List of parameters to plot if type is "selected"
+    ax_clients : list of AxClient
+        List of AxClient instances, each representing optimization runs for
+        different intervals.
+
+    Returns
+    -------
+    None
+        This function saves the plot to folder named "best_params" in the
+        output directory and does not return any value.
+    """
     dic_best = {}
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
         ax_client = ax_clients[i]
         dic_best[float(st_i)] = ax_client.get_best_parameters()
-
-
     parallel_data = []
     for x in dic_best.keys():
         parallel_dic = dic_best[x][0]
         parallel_dic["interval"] = x
         parallel_data.append(parallel_dic)
-        
-    df = pd.DataFrame(parallel_data)
 
+    df = DataFrame(parallel_data)
     li = list(dic_best[float(st_i)][0].keys())
     li.remove("interval")
-    config_plotScope = config["evaluation"]["plots"]["bestParams"]["plotScope"]
-    if config_plotScope["type"] == "selected":
-        sel_li = config_plotScope["selectedParams"]
+    config_best_scope = config["evaluation"]["plots"]["best_params"]["plot_scope"]
+    if config_best_scope["type"] == "selected":
+        sel_li = config_best_scope["selected_params"]
         if set(sel_li).issubset(set(li)):
             li = sel_li
         else:
             raise ValueError("Selected params not in BO params")
-    plot_li = ['interval']
+
+    plot_li = ["interval"]
     plot_li.extend(li)
     plot_df = df[plot_li]
 
     path = join(config["evaluation"]["output_path"], "best_params")
     makedirs(path, exist_ok=True)
-
     for xi in li:
         fig1, ax1 = plt.subplots(figsize=(10, 5))
         ax1.plot(plot_df["interval"], plot_df[xi], marker="o")
@@ -110,116 +206,274 @@ def plot_best_params(config, ax_clients):
         ax1.set_xlabel("interval")
         ax1.set_ylabel(xi)
         fig1.tight_layout()
-        fig1.savefig(join(path, "parallel_plot_best_params_{}.svg".format(xi)), bbox_inches="tight", transparent=True)
+        fig1.savefig(
+            join(path, "parallel_plot_best_params_{}.svg".format(xi)),
+            bbox_inches="tight",
+            transparent=True,
+        )
         plt.close(fig1)
 
-def plot_trialvsobj(config, ax_clients):
-    data_li = []
 
+def plot_trial_vs_obj(config, ax_clients):
+    """
+    Plot objective values across trials for different optimization intervals.
+
+    This function visualizes how the objective metric (e.g., execution time)
+    evolves across Bayesian optimization trials. For each interval defined by
+    a start time, it generates a scatter plot of trial objective values and a
+    line plot showing the best (minimum) value found up to each trial. The
+    objective values are normalized relative to the first trial.
+
+    Parameters
+    ----------
+    config : dict
+        Same configuration dictionary used for the Bayesian optimization run,
+        which also contains the settings for evaluation. It must include keys
+        like:
+            - evaluation.output_path : Directory to save the generated plot.
+    ax_clients : list of AxClient
+        List of AxClient instances, each representing optimization runs for
+        different intervals.
+
+    Returns
+    -------
+    None
+        This function saves the plot to folder named "trial_vs_obj" in the
+        output directory and does not return any value.
+    """
+    data_li = []
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
         ax_client = ax_clients[i]
         df = ax_client.experiment.fetch_data().df
         df["best"] = df["mean"].cummin()
         data_li.append(df)
 
-    path = join(config["evaluation"]["output_path"], "trialvsobj")
+    path = join(config["evaluation"]["output_path"], "trial_vs_obj")
     makedirs(path, exist_ok=True)
 
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
         fig, ax = plt.subplots(figsize=(6, 2.5))
         normal = data_li[i]["mean"].iloc[0]
-        trial_data = np.clip((data_li[i]["mean"])/normal, None, 1.5)
-        best_data = np.clip((data_li[i]["best"])/normal, None, 1.5)
+        trial_data = np.clip((data_li[i]["mean"]) / normal, None, 1.5)
+        best_data = np.clip((data_li[i]["best"]) / normal, None, 1.5)
         ax.scatter(data_li[i]["trial_index"], trial_data, marker="x", label="trial")
         ax.plot(data_li[i]["trial_index"], best_data, label="best param")
         ax.legend()
         ax.set_xlabel("trial index")
         ax.set_ylabel("obj (normalized)")
         ax.set_title("objective v/s trials, interval={}".format(st_i))
-        fig.savefig(join(path, "trialvsobj_int_{}.svg".format(st_i)), bbox_inches="tight", transparent=True)
+        fig.savefig(
+            join(path, "trialvsobj_int_{}.svg".format(st_i)),
+            bbox_inches="tight",
+            transparent=True,
+        )
         plt.close(fig)
 
-def plot_gaussianProcess(config, ax_clients):
 
+def plot_gaussian_process(config, ax_clients):
+    """
+    Plot Gaussian Process (GP) predictions for different parameters across
+    intervals.
+
+    This function visualizes the mean prediction and uncertainty of the Gaussian
+    Process model learned during Bayesian Optimization (via BoTorch/Ax) for
+    each optimization interval. For each selected parameter, predictions are
+    made over a grid (for continuous variables) or discrete values (for
+    categorical variables), while other parameters are handled using fixed values,
+    optimal values, or marginalized over all observed trials.
+
+    Parameters
+    ----------
+    config : dict
+        Same configuration dictionary used for the Bayesian optimization run,
+        which also contains the settings for evaluation. It must include keys
+        like:
+            - evaluation.output_path : Path where plots will be saved.
+            - evaluation.plots.gaussian_process.param_setting :
+                Strategy for fixing parameters not currently being plotted:
+                - type : "optimal", "fixed" or "marginalization"
+                    * "optimal" : Uses the best parameter set found via
+                                  optimization for predictions.
+                    * "fixed" : Uses a predefined fixed parameter dictionary,
+                                supplemented with optimal values for missing keys.
+                    * "marginalization" : Uses all observed parameter sets
+                                         (from all trials), and predictions
+                                         are averaged over these to marginalize
+                                         the effect of non-plotted parameters.
+            - evaluation.plots.gaussian_process.plot_scope :
+                Scope of parameters to include in plots:
+                - type : "all" or "selected"
+                - selected_params : Names of parameters to include
+                                    in plots (if type is "selected").
+    ax_clients : list of AxClient
+        List of AxClient instances, each representing optimization runs for
+        different intervals.
+
+    Returns
+    -------
+    None
+        This function saves the plot to folder named "gaussian_process" in the
+        output directory and does not return any value.
+
+    Notes
+    -----
+    - For `RangeParameter`s (continuous), the mean and 95% confidence interval
+      are plotted over a grid.
+    - For `ChoiceParameter`s (categorical), a bar chart with error bars is used.
+    - Observed trial results are overlaid as scatter points for context.
+    """
     density = 100
     metric_name = "execution_time"
-    path = join(config["evaluation"]["output_path"], "gaussianProcess")
+    path = join(config["evaluation"]["output_path"], "gaussian_process")
     makedirs(path, exist_ok=True)
 
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
-
         ax_client = ax_clients[i]
         modelbridge = Generators.BOTORCH_MODULAR(
             experiment=ax_client.experiment,
             data=ax_client.experiment.fetch_data(),
         )
         param_names = [p for p in ax_client.experiment.parameters.keys()]
-        param_setting = config["evaluation"]["plots"]["gaussianProcess"]["param_setting"]
+        param_setting = config["evaluation"]["plots"]["gaussian_process"][
+            "param_setting"
+        ]
         if param_setting["type"] == "optimal":
-            slice_values = ax_client.get_best_parameters()[0]
+            slice_values = [ax_client.get_best_parameters()[0]]
         elif param_setting["type"] == "fixed":
-            slice_values = param_setting["fixed_values"]
+            slice_values = [param_setting["fixed_values"]]
+            for name, parame in modelbridge._search_space.parameters.items():
+                if name not in slice_values[0]:
+                    slice_values[0][name] = ax_client.get_best_parameters()[0][name]
+        elif param_setting["type"] == "marginalization":
+            slice_values = [
+                t.arm.parameters for t in ax_client.experiment.trials.values()
+            ]
         else:
             raise ValueError("Unknown param_setting type")
 
-        fixed_features = ObservationFeatures(parameters=slice_values)
-
+        config_gp_scope = config["evaluation"]["plots"]["gaussian_process"][
+            "plot_scope"
+        ]
         to_plot = []
-        config_plotScope = config["evaluation"]["plots"]["gaussianProcess"]["plotScope"]
-        if config_plotScope["type"] == "all":
+        if config_gp_scope["type"] == "all":
             to_plot = param_names
-        elif config_plotScope["type"] == "selected":
-            to_plot = config_plotScope["selectedParams"]
+        elif config_gp_scope["type"] == "selected":
+            to_plot = config_gp_scope["selected_params"]
         else:
-            raise ValueError("Unknown plotScope type")
+            raise ValueError("Unknown plot_scope type")
+        data = ax_client.experiment.fetch_data()
+        df = data.df
 
         for param_name in to_plot:
             param = modelbridge._search_space.parameters[param_name]
+            obs_x = []
+            obs_y = []
+            for trial in ax_client.experiment.trials.values():
+                arm = trial.arm
+                param_val = arm.parameters[param_name]
+                obs_x.append(param_val)
+                obs_y.append(df[df["arm_name"] == arm.name]["mean"].values[0])
 
             if isinstance(param, ChoiceParameter):
-                grid = param.values  # categorical grid: list of discrete values
+                grid = param.values
             elif isinstance(param, RangeParameter):
                 param_range = (param.lower, param.upper)
                 grid = np.linspace(param_range[0], param_range[1], density)
             else:
                 raise ValueError("Unsupported parameter type")
-            
-            fixed_values = slice_values.copy()
-            for name, parame in modelbridge._search_space.parameters.items():
-                if name not in fixed_values:
-                    fixed_values[name] = ax_client.get_best_parameters()[0][name]
+
             prediction_features = []
             for x in grid:
-                if fixed_features is None:
-                    raise ValueError("Expected fixed_features to be non-None")
-                predf = deepcopy(fixed_features)
-                predf.parameters = fixed_values.copy()
-                predf.parameters[param_name] = x
-                prediction_features.append(predf)
+                for sample in slice_values:
+                    pred_params = deepcopy(sample)
+                    pred_params[param_name] = x
+                    prediction_features.append(
+                        ObservationFeatures(parameters=pred_params)
+                    )
 
-            f, cov = modelbridge.predict(prediction_features)
-            y_vals = np.array(f[metric_name])
-            y_std = np.sqrt(np.array(cov[metric_name][metric_name]))
+            means, covs = modelbridge.predict(prediction_features)
+            mean_array = np.array(means[metric_name]).reshape((len(grid), -1))
+            std_array = np.sqrt(np.array(covs[metric_name][metric_name])).reshape(
+                (len(grid), -1)
+            )
+            y_vals = mean_array.mean(axis=1)
+            y_std = std_array.mean(axis=1)
             # Plotting
             fig_gp, ax_gp = plt.subplots(figsize=(6, 2.5))
-            ax_gp.plot(grid, y_vals, label="Mean Prediction", marker="o", markersize=1)
-            ax_gp.fill_between(grid, y_vals - 1.96 * y_std, y_vals + 1.96 * y_std, alpha=0.3, label="95% CI")
-            ax_gp.set_title(f"Gaussian Process - interval = {st_i} - {param_name}")
+            if isinstance(param, RangeParameter):
+                ax_gp.plot(grid, y_vals, label="Mean Prediction")
+                ax_gp.fill_between(
+                    grid,
+                    y_vals - 1.96 * y_std,
+                    y_vals + 1.96 * y_std,
+                    alpha=0.3,
+                    label="95% CI",
+                )
+                ax_gp.scatter(
+                    obs_x, obs_y, color="blue", label="Observed Trials", marker="x", s=2
+                )
+                low_lim, up_lim = config["optimization"]["gamg"][param_name]["bounds"]
+                ax_gp.set_xlim(low_lim, up_lim)
+            elif isinstance(param, ChoiceParameter):
+                ax_gp.bar(grid, y_vals, color="skyblue", label="Mean Prediction")
+                ax_gp.errorbar(
+                    grid,
+                    y_vals,
+                    yerr=1.96 * y_std,
+                    fmt="o",
+                    color="r",
+                    capsize=2,
+                    label="95% CI",
+                )
+                ax_gp.scatter(
+                    obs_x, obs_y, color="blue", label="Observed Trials", marker="x", s=2
+                )
+                for label in ax_gp.get_xticklabels():
+                    label.set_rotation(30)
+                    label.set_horizontalalignment("right")
+            else:
+                raise KeyError("Paramter type not defined")
+            ax_gp.set_title(f"Gaussian Process - interval = {st_i} - {param_setting["type"]}")
             ax_gp.set_xlabel(param_name)
             ax_gp.set_ylabel("Execution Time (Mean)")
             ax_gp.legend()
-            if isinstance(param, ChoiceParameter):
-                for label in ax_gp.get_xticklabels():
-                    label.set_rotation(30)
-                    label.set_horizontalalignment('right')
-            fig_gp.tight_layout()
-            fig_gp.savefig(join(path, f"gauProc_{param_name}_interval_{st_i}.svg"),
-                           bbox_inches="tight", transparent=True)
-            
+            fig_gp.savefig(
+                join(path, f"gauProc_{param_name}_interval_{st_i}.svg"),
+                bbox_inches="tight",
+                transparent=True,
+            )
+
             plt.close(fig_gp)
 
-def plot_featureImportance(config, ax_clients):
-    path = join(config["evaluation"]["output_path"], "featureImportance")
+
+def plot_feature_importance(config, ax_clients):
+    """
+    Plot feature importance of parameters for each optimization interval.
+
+    This function computes and visualizes the relative importance of input
+    parameters to the objective metric (execution time) as estimated by the
+    Gaussian Process model trained during Bayesian Optimization. It handles both
+    continuous and categorical parameters.
+
+    Parameters
+    ----------
+    config : dict
+        Same configuration dictionary used for the Bayesian optimization run,
+        which also contains the settings for evaluation. It must include keys
+        like:
+            - evaluation.output_path : Directory to save the generated plot.
+    ax_clients : list of AxClient
+        List of AxClient instances, each representing optimization runs for
+        different intervals.
+
+    Returns
+    -------
+    None
+        This function saves the plot to folder named "feature_importance" in the
+        output directory and does not return any value.
+    """
+
+    path = join(config["evaluation"]["output_path"], "feature_importance")
     makedirs(path, exist_ok=True)
 
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
@@ -228,25 +482,69 @@ def plot_featureImportance(config, ax_clients):
             experiment=ax_client.experiment,
             data=ax_client.experiment.fetch_data(),
         )
+        param_names = [p for p in ax_client.experiment.parameters.keys()]
         importances = modelbridge.feature_importances("execution_time")
-        sorted_items = sorted(importances.items(), key=lambda x: -x[1])
+        aggregated_importances = {}
+
+        for param in param_names:
+            if isinstance(modelbridge._search_space.parameters[param], ChoiceParameter):
+                total = sum(
+                    value for key, value in importances.items() if key.startswith(param)
+                )
+                aggregated_importances[param] = total
+            else:
+                if param in importances:
+                    aggregated_importances[param] = importances[param]
+
+        sorted_items = sorted(aggregated_importances.items(), key=lambda x: -x[1])
         params, values = zip(*sorted_items)
         fig, ax = plt.subplots(figsize=(6, 2.5))
-        ax.bar(params, values, color='skyblue')
+        ax.bar(params, values, color="skyblue")
         ax.set_xlabel("Parameters")
         ax.set_ylabel("Importance")
         ax.set_title("Feature Importance - interval={}".format(st_i))
         for label in ax.get_xticklabels():
             label.set_rotation(45)
-            label.set_horizontalalignment('right')
-            
+            label.set_horizontalalignment("right")
+
         fig.tight_layout()
-        fig.savefig(join(path, f"featureImportance_interval_{st_i}.svg"),
-                           bbox_inches="tight", transparent=True)
+        fig.savefig(
+            join(path, f"featureImportance_interval_{st_i}.svg"),
+            bbox_inches="tight",
+            transparent=True,
+        )
         plt.close(fig)
 
-def plot_crossValidation(config, ax_clients):
-    path = join(config["evaluation"]["output_path"], "crossValidation")
+
+def plot_cross_validation(config, ax_clients):
+    """
+    Perform and plot cross-validation results for each optimization interval.
+
+    This function evaluates the generalization performance of the trained
+    Gaussian Process (GP) surrogate model using leave-one-out cross-validation
+    on observed data. It compares predicted values with actual (observed)
+    objective values (execution time) and visualizes the results with
+    prediction error bars and ideal y=x reference lines.
+
+    Parameters
+    ----------
+    config : dict
+        Same configuration dictionary used for the Bayesian optimization run,
+        which also contains the settings for evaluation. It must include keys
+        like:
+            - evaluation.output_path : Directory to save the generated plot.
+    ax_clients : list of AxClient
+        List of AxClient instances, each representing optimization runs for
+        different intervals.
+
+    Returns
+    -------
+    None
+        This function saves the plot to folder named "cross_validation" in the
+        output directory and does not return any value.
+    """
+
+    path = join(config["evaluation"]["output_path"], "cross_validation")
     makedirs(path, exist_ok=True)
 
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
@@ -274,24 +572,37 @@ def plot_crossValidation(config, ax_clients):
         y_pred = np.array(y_pred)
         y_std = np.array(y_std)
 
-        # --- Plot ---
         fig, ax = plt.subplots(figsize=(3.5, 3.5))
-        
-        ax.errorbar(y_true, y_pred, yerr=1.96 * y_std, fmt='o', capsize=3, label='Prediction (95% CI)', markersize = 2)
-        ax.plot([min(y_true), max(y_true)], [min(y_true), max(y_true)], 'r--', label='Ideal: y = x')
-
+        ax.errorbar(
+            y_true,
+            y_pred,
+            yerr=1.96 * y_std,
+            fmt="o",
+            capsize=3,
+            label="Prediction (95% CI)",
+            markersize=2,
+        )
+        ax.plot(
+            [min(y_true), max(y_true)],
+            [min(y_true), max(y_true)],
+            "r--",
+            label="Ideal: y = x",
+        )
         ax.set_xlabel("Observed")
         ax.set_ylabel("Predicted")
         ax.set_title("Cross Validation, interval={}".format(st_i))
         ax.legend()
         ax.grid(True)
-
         fig.tight_layout()
-        fig.savefig(join(path, f"crossValidation_interval_{st_i}.svg"),
-                           bbox_inches="tight", transparent=True)
+        fig.savefig(
+            join(path, f"crossValidation_interval_{st_i}.svg"),
+            bbox_inches="tight",
+            transparent=True,
+        )
         plt.close(fig)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
 
     # load settings
     config_file = sys.argv[1] if len(sys.argv) > 1 else "config.yaml"
@@ -300,29 +611,29 @@ if __name__ == '__main__':
             config = safe_load(cf)
     except Exception as e:
         print(e)
-    
-    config_eval = config['evaluation']
+
+    config_eval = config["evaluation"]
     plt.style.use(config_eval["plot_attributes"]["style_sheet"])
-    plt.rcParams.update({
-        "text.usetex": False
-    })
-    plt.rcParams.update({'font.size': 8})
-    
+    plt.rcParams.update({"text.usetex": False})
+    plt.rcParams.update({"font.size": 8})
+
     ax_clients = []
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
-        ax_client = AxClient().load_from_json_file(join(f"{config_eval['data_path']}", f"ax_client_int_{i}.json"))
+        ax_client = AxClient().load_from_json_file(
+            join(f"{config['experiment']['exp_path']}", f"ax_client_int_{i}.json")
+        )
         ax_clients.append(ax_client)
-    
+
     makedirs(config_eval["output_path"], exist_ok=True)
-    if config_eval["plots"]["trialVsBase"]["isReq"]:
+    if config_eval["plots"]["trial_vs_base"]["isReq"]:
         plot_trial_vs_base(config, ax_clients)
-    if config_eval["plots"]["bestParams"]["isReq"]:
+    if config_eval["plots"]["best_params"]["isReq"]:
         plot_best_params(config, ax_clients)
-    if config_eval["plots"]["trialVsObj"]["isReq"]:
-        plot_trialvsobj(config, ax_clients)
-    if config_eval["plots"]["gaussianProcess"]["isReq"]:
-        plot_gaussianProcess(config, ax_clients)
-    if config_eval["plots"]["featureImportance"]["isReq"]:
-        plot_featureImportance(config, ax_clients)
-    if config_eval["plots"]["crossValidation"]["isReq"]:
-        plot_crossValidation(config, ax_clients)        
+    if config_eval["plots"]["trial_vs_obj"]["isReq"]:
+        plot_trial_vs_obj(config, ax_clients)
+    if config_eval["plots"]["gaussian_process"]["isReq"]:
+        plot_gaussian_process(config, ax_clients)
+    if config_eval["plots"]["feature_importance"]["isReq"]:
+        plot_feature_importance(config, ax_clients)
+    if config_eval["plots"]["cross_validation"]["isReq"]:
+        plot_cross_validation(config, ax_clients)

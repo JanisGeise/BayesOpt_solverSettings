@@ -111,7 +111,7 @@ More test cases etc. will follow
 
 The evaluation of trial runs can be done using the "eval_runs.py" script. The script make evaluation plots, whose settings can be controlled from the config file. Different plots that are output from the script -
 
-1. "trial vs base" - It compares the execution time of the trials at different intervals with the default settings case
+1. "trial vs base" - It compares the execution time of the trials at different intervals with the default settings case. This plot requires the execution time data of benchmark cases. Data in the required structure can be generated using "copy_data.sh" script in the "baseCase_benchmark" folder. The path to this folder needs to be provided in the config file.
 2. "best parms" - Makes parallel plots of best parameters from the optimization across different intervals
 3. "trial vs obj" - Plot to check how the objective function varies over trials
 4. "gaussian process" - Makes the gaussian process plot for a given parameters
