@@ -71,7 +71,7 @@ def run_parameter_variation(
     exp: Experiment, trials: dict, config: dict, time_idx: int
 ) -> Dict[int, float]:
     opt_config = config["optimization"]
-    rs = RunSettings("Allrun.solve")
+    rs = RunSettings(exe="bash", exe_args="Allrun.solve")
     bs = batch_settings_from_config(exp, config.get("batch_settings"))
     path = join(exp.exp_path, "base_sim", "processor0")
     startTime = find_closest_time(path, opt_config["startTime"][time_idx])

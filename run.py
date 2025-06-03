@@ -32,7 +32,7 @@ exp = Experiment(**config["experiment"])
 sim_config = config["simulation"]
 base_case_path = sim_config["base_case"]
 base_name = base_case_path.split("/")[-1]
-rs = RunSettings("Allrun.pre")
+rs = RunSettings(exe="bash", exe_args="Allrun.pre")
 bs = batch_settings_from_config(exp, config.get("batch_settings"))
 if not isdir(join(exp.exp_path, "base_sim")):
     base_sim = exp.create_model(
