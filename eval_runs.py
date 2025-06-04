@@ -433,7 +433,8 @@ def plot_gaussian_process(config, ax_clients):
                     label.set_horizontalalignment("right")
             else:
                 raise KeyError("Paramter type not defined")
-            ax_gp.set_title(f"Gaussian Process - interval = {st_i} - {param_setting["type"]}")
+            type = param_setting["type"]
+            ax_gp.set_title(f"Gaussian Process - interval = {st_i} - {type}")
             ax_gp.set_xlabel(param_name)
             ax_gp.set_ylabel("Execution Time (Mean)")
             ax_gp.legend()
