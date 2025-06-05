@@ -107,22 +107,23 @@ evaluation:
   output_path: "output"
   benchmark_path: "benchmark_time_info"
   plots:
-    trialVsBase:
+    trial_vs_base:
       isReq: True
-    bestParams: 
+    best_params: 
       isReq: True
-      plotScope:
+      plot_scope:
         type: "all" # "selected or all"
-        selectedParams: ["smoother", "nPostSweeps"] # required if type == "selected"
-    trialVsObj:
+        selected_params: ["smoother", "nPostSweeps"] # required if type == "selected"
+    trial_vs_obj:
       isReq: True
-    gaussianProcess:
+    gaussian_process:
       isReq: True
-      plotScope:
+      plot_scope:
         type: "all" #  "selected or all"
-        selectedParams: ["smoother", "nPostSweeps"] # required if type == "selected"
+        selected_params: ["smoother", "nPostSweeps"] # required if type == "selected"
       param_setting:
         type: "marginalization" #  "optimal, fixed or marginalization"
+        n_marginal_samples: 100 # required if type == "marginalization"
         fixed_values: # required if type == "fixed"
           smoother: "FDIC"
           interpolateCorrection: "yes"
@@ -132,9 +133,9 @@ evaluation:
           nCellsInCoarsestLevel: 10
           toleranceCoarsest: -6
           relTolCoarsest: -2
-    featureImportance:
+    feature_importance:
         isReq: True
-    crossValidation:
+    cross_validation:
         isReq: True  
   plot_attributes:
     style_sheet: "classic" # "dark_background, classic or any other from matplotlib"

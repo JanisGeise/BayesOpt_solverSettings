@@ -345,9 +345,10 @@ def plot_gaussian_process(config, ax_clients):
                 if name not in slice_values[0]:
                     slice_values[0][name] = ax_client.get_best_parameters()[0][name]
         elif param_setting["type"] == "marginalization":
-            slice_values = [
-                t.arm.parameters for t in ax_client.experiment.trials.values()
-            ]
+            sobol_model = Generators.SOBOL(experiment=ax_client.experiment)
+            num_marginal_samples = config["evaluation"]["plots"]["gaussian_process"].get("n_marginal_samples", 50)
+            sobol_generator_run = sobol_model.gen(n=num_marginal_samples)
+            slice_values = [arm.parameters for arm in sobol_generator_run.arms]
         else:
             raise ValueError("Unknown param_setting type")
 
