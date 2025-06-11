@@ -13,6 +13,8 @@ from copy import deepcopy
 from ax.core.parameter import ChoiceParameter, RangeParameter
 from ax.modelbridge.cross_validation import cross_validate
 import os
+import matplotlib as mpl
+from ax.analysis.plotly.parallel_coordinates import ParallelCoordinatesPlot
 
 
 def plot_trial_vs_base(config, ax_clients):
@@ -103,7 +105,10 @@ def plot_trial_vs_base(config, ax_clients):
     )
 
     ax.bar(t_plot, mean_array, width=step * 0.001 * 0.9, align="edge", color="skyblue")
-    ax.set_xlim(0, 6)
+    xlim_upper = float(config["simulation"]["startTime"]) + float(
+        config["simulation"]["duration"]
+    )
+    ax.set_xlim(0, xlim_upper)
     ax.set_xlabel(r"$\tilde{t}$")
     ax.set_ylabel(r"$T_{{{stept}\Delta t}}$".format(stept=step))
     ax.set_title("Execution time for base case - {} time steps".format(step))
@@ -115,7 +120,7 @@ def plot_trial_vs_base(config, ax_clients):
         data = ax_clients[i].experiment.fetch_data().df["mean"].values
         if i == 0:
             ax.scatter(
-                [float(st_i)] * len(data),
+                [float(st_i) + step * 0.001 * 0.9 / 2] * len(data),
                 data,
                 marker="x",
                 s=10,
@@ -126,7 +131,7 @@ def plot_trial_vs_base(config, ax_clients):
             )
         else:
             ax.scatter(
-                [float(st_i)] * len(data),
+                [float(st_i) + step * 0.001 * 0.9 / 2] * len(data),
                 data,
                 marker="x",
                 s=10,
@@ -147,10 +152,12 @@ def plot_best_params(config, ax_clients):
     """
     Plot the best parameters across different optimization intervals.
 
-    This function extracts the best parameters obtained from Bayesian optimization
+    This function extracts the top-N best parameters obtained from Bayesian optimization
     for each specified interval (start time), and generates line plots showing how
-    the best value of each parameter evolves with the interval. The user can choose
-    to plot only a subset of parameters through the configuration.
+    the best values of each parameter evolves with the interval. The user can choose
+    to plot only a subset of parameters through the configuration. The markers are colored
+    to signify the execution times and the ranking of the best parameter sets is done by
+    coloring the lines.
 
     Parameters
     ----------
@@ -162,6 +169,7 @@ def plot_best_params(config, ax_clients):
             - evaluation.plots.best_params.plot_scope : Dict with keys:
                 - type : "all" or "selected"
                 - selected_params : List of parameters to plot if type is "selected"
+            - evaluation.plots.best_params.top_N : Number of best trials to plot
     ax_clients : list of AxClient
         List of AxClient instances, each representing optimization runs for
         different intervals.
@@ -173,45 +181,84 @@ def plot_best_params(config, ax_clients):
         output directory and does not return any value.
     """
     dic_best = {}
+    rows = []
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
         ax_client = ax_clients[i]
+        df_trials = ax_client.get_trials_data_frame()
+        df_trials = df_trials.query("trial_status == 'COMPLETED'")
+        df_sorted = df_trials.sort_values(by="execution_time", ascending=True).head(5)
         dic_best[float(st_i)] = ax_client.get_best_parameters()
-    parallel_data = []
-    for x in dic_best.keys():
-        parallel_dic = dic_best[x][0]
-        parallel_dic["interval"] = x
-        parallel_data.append(parallel_dic)
-
-    df = DataFrame(parallel_data)
-    li = list(dic_best[float(st_i)][0].keys())
-    li.remove("interval")
-    config_best_scope = config["evaluation"]["plots"]["best_params"]["plot_scope"]
-    if config_best_scope["type"] == "selected":
-        sel_li = config_best_scope["selected_params"]
-        if set(sel_li).issubset(set(li)):
-            li = sel_li
-        else:
+        for rank, trial_index in enumerate(df_sorted.trial_index, start=1):
+            params = ax_client.experiment.trials[trial_index].arm.parameters.copy()
+            params.update(
+                {
+                    "interval": float(st_i),
+                    "rank": rank,
+                    "execution_time": df_sorted["execution_time"].iloc[rank - 1],
+                }
+            )
+            rows.append(params)
+    df = DataFrame(rows)
+    param_cols = [
+        c for c in df.columns if c not in ("interval", "rank", "execution_time")
+    ]
+    cfg_scope = config["evaluation"]["plots"]["best_params"]["plot_scope"]
+    if cfg_scope["type"] == "selected":
+        sel = cfg_scope["selected_params"]
+        if not set(sel).issubset(param_cols):
             raise ValueError("Selected params not in BO params")
-
-    plot_li = ["interval"]
-    plot_li.extend(li)
-    plot_df = df[plot_li]
-
+        param_cols = sel
+    cmap = mpl.colormaps.get_cmap("tab10")
     path = join(config["evaluation"]["output_path"], "best_params")
     makedirs(path, exist_ok=True)
-    for xi in li:
-        fig1, ax1 = plt.subplots(figsize=(10, 5))
-        ax1.plot(plot_df["interval"], plot_df[xi], marker="o")
-        ax1.set_title("Best parameter - {} - for different intervals".format(xi))
-        ax1.set_xlabel("interval")
-        ax1.set_ylabel(xi)
-        fig1.tight_layout()
-        fig1.savefig(
-            join(path, "parallel_plot_best_params_{}.svg".format(xi)),
+    if "top_N" not in config.get("evaluation", {}).get("plots", {}).get(
+        "best_params", {}
+    ):
+        raise ValueError("top_N parameter not defined")
+    top_n = config["evaluation"]["plots"]["best_params"]["top_N"]
+    max_z = top_n + 10
+    for p in param_cols:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        for rank in range(1, top_n + 1):
+            slice_i = df[df["rank"] == rank]
+            x = slice_i["interval"]
+            y = slice_i[p]
+            c = slice_i["execution_time"]
+            ax.plot(
+                x,
+                y,
+                color=cmap((rank - 1) % cmap.N),
+                linewidth=1,
+                alpha=0.7,
+                label=f"rank {rank}",
+                zorder=max_z - rank,
+            )
+
+            scatter = ax.scatter(
+                x,
+                y,
+                c=c,
+                cmap="viridis",
+                s=70,
+                edgecolors="k",
+                zorder=max_z - rank + 0.5,
+            )
+
+        ax.set_title(f"Ranking best params - {p} across optimisation intervals")
+        ax.set_xlabel("interval")
+        ax.set_ylabel(p)
+        ax.legend(title="trial rank")
+
+        cbar = fig.colorbar(scatter, ax=ax)
+        cbar.set_label("Execution Time (s)")
+
+        fig.tight_layout()
+        fig.savefig(
+            join(path, f"best_param_plot_top{top_n}_{p}.svg"),
             bbox_inches="tight",
             transparent=True,
         )
-        plt.close(fig1)
+        plt.close(fig)
 
 
 def plot_trial_vs_obj(config, ax_clients):
@@ -346,7 +393,9 @@ def plot_gaussian_process(config, ax_clients):
                     slice_values[0][name] = ax_client.get_best_parameters()[0][name]
         elif param_setting["type"] == "marginalization":
             sobol_model = Generators.SOBOL(experiment=ax_client.experiment)
-            num_marginal_samples = config["evaluation"]["plots"]["gaussian_process"].get("n_marginal_samples", 50)
+            num_marginal_samples = config["evaluation"]["plots"][
+                "gaussian_process"
+            ].get("n_marginal_samples", 50)
             sobol_generator_run = sobol_model.gen(n=num_marginal_samples)
             slice_values = [arm.parameters for arm in sobol_generator_run.arms]
         else:
@@ -603,6 +652,58 @@ def plot_cross_validation(config, ax_clients):
         )
         plt.close(fig)
 
+def plot_parallel_coordinates(config, ax_clients):
+    """
+    Generate a parallel coordinates plot to visualize high-dimensional data.
+
+    This plot is useful for understanding trends, patterns, and trade-offs
+    between multiple input features across samples or trials.
+
+    Parameters
+    ----------
+    config : dict
+        Same configuration dictionary used for the Bayesian optimization run,
+        which also contains the settings for evaluation. It must include keys
+        like:
+            - evaluation.output_path : Directory to save the generated plot.
+    ax_clients : list of AxClient
+        List of AxClient instances, each representing optimization runs for
+        different intervals.
+
+    Returns
+    -------
+    None
+        This function saves the plot to folder named "parallel_coordinates" in the
+        output directory and does not return any value.
+    """
+
+    path = join(config["evaluation"]["output_path"], "parallel_coordinates")
+    makedirs(path, exist_ok=True)
+
+    for i, st_i in enumerate(config["optimization"]["startTime"][:]):
+        ax_client = ax_clients[i]
+        analysis = ParallelCoordinatesPlot()
+        cards = analysis.compute(
+            experiment=ax_client._experiment,
+            generation_strategy=ax_client._generation_strategy,
+            adapter=None,
+        )
+        fig = cards[0].get_figure()
+        fig.update_layout(
+            title={
+                "text": "Parallel coordinates plot, interval={}".format(st_i),
+                "x": 0.5,
+                "xanchor": "center",
+                "y": 0.05,
+                "yanchor": "top",
+            }
+        )
+        fig.write_image(
+            join(path, f"parallel_coordinates_interval_{st_i}.png"),
+            width=1300,
+            height=800,
+        )
+
 
 if __name__ == "__main__":
 
@@ -639,3 +740,5 @@ if __name__ == "__main__":
         plot_feature_importance(config, ax_clients)
     if config_eval["plots"]["cross_validation"]["isReq"]:
         plot_cross_validation(config, ax_clients)
+    if config_eval["plots"]["parallel_coordinates"]["isReq"]:
+        plot_parallel_coordinates(config, ax_clients)

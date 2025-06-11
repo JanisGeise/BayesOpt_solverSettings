@@ -12,10 +12,10 @@ module load release/24.04 GCC/12.3.0 OpenMPI/4.1.5 OpenFOAM/v2406
 source $FOAM_BASH
 mkdir openfoam_cases
 
-CURR_DIR="/data/horse/ws/tata993f-general_testing/baseCase_benchmark/"
+CURR_DIR="/data/horse/ws/tata993f-general_testing/BayesOpt_solverSettings/baseCase_benchmark/"
 CASE_DIR="${CURR_DIR}openfoam_cases/run_$SLURM_ARRAY_TASK_ID"
 mkdir -p "$CASE_DIR"
-cp -r "${CURR_DIR}base_sim/*" "$CASE_DIR"
+cp -r ${CURR_DIR}base_sim/* $CASE_DIR
 cd "$CASE_DIR"
 
 bash Allrun.pre

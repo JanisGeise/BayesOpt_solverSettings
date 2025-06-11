@@ -1,0 +1,36 @@
+#!/bin/bash
+#SBATCH --job-name=OAT_buffet
+#SBATCH --cpus-per-task=1
+#SBATCH --time=01:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=100
+#SBATCH --partition=barnard
+#SBATCH --reservation=p_cfd_flowcontrol_466
+module load release/24.04 GCC/12.3.0 OpenMPI/4.1.5 OpenFOAM/v2406
+source $FOAM_BASH
+BASE_DIR=$PWD
+TEMPLATE_DIR="$BASE_DIR/base_case"
+CASE_ROOT="$BASE_DIR/openfoam_cases"
+
+# Create parent folder to hold all run directories
+mkdir -p "$CASE_ROOT"
+N=10
+# -------------------- serial loop ---------------------
+for i in $(seq 1 $N); do
+    echo "==========  Starting Run $i of 10  =========="
+
+    # Create fresh run_i directory from base_sim
+    RUN_DIR="$CASE_ROOT/run_${i}"
+    cp -r "$TEMPLATE_DIR" "$RUN_DIR"
+
+    # Change to the run directory and execute ./Allrun
+    cd "$RUN_DIR" || { echo "Failed to enter $RUN_DIR"; exit 1; }
+
+    ./Allrun >& log.allrun
+
+    echo "----  Completed Run $i; results stored in $RUN_DIR  ----"
+
+    cd "$BASE_DIR"
+done
+
+echo "All 10 runs completed successfully."

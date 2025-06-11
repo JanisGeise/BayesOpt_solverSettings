@@ -111,6 +111,7 @@ evaluation:
       isReq: True
     best_params: 
       isReq: True
+      top_N: 5
       plot_scope:
         type: "all" # "selected or all"
         selected_params: ["smoother", "nPostSweeps"] # required if type == "selected"
@@ -137,5 +138,7 @@ evaluation:
         isReq: True
     cross_validation:
         isReq: True  
+    parallel_coordinates:
+        isReq: True
   plot_attributes:
     style_sheet: "classic" # "dark_background, classic or any other from matplotlib"
