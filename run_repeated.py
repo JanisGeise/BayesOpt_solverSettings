@@ -1,12 +1,12 @@
 import sys
 from os import makedirs
-from os.path import isdir, join
-from itertools import islice
-from logging import INFO
+from os.path import join
 from yaml import safe_load
-import pandas as pd
+from pandas import read_csv
+import numpy as np
 from smartsim import Experiment
-from execution import run_parameter_variation, batch_settings_from_config
+from smartsim.settings import RunSettings
+from execution import batch_settings_from_config
 
 
 # load settings
@@ -25,38 +25,41 @@ exp = Experiment(**config["experiment"])
 sim_config = config["simulation"]
 base_case_path = sim_config["base_case"]
 base_name = base_case_path.split("/")[-1]
-rs = exp.create_run_settings(exe="bash", exe_args="Allrun.pre")
+rs = RunSettings(exe="bash", exe_args="Allrun.pre")
 bs = batch_settings_from_config(exp, config.get("batch_settings"))
-if not isdir(join(exp.exp_path, "base_sim")):
-    base_sim = exp.create_model(
-        "base_sim",
-        params={
-                "startTime" : sim_config["startTime"],
-                "endTime": sim_config["startTime"] + sim_config["duration"],
-                "writeInterval" : sim_config["writeInterval"],
-                "deltaT" : sim_config["deltaT"]
-            } | sim_config["gamg"],
-        run_settings=rs,
-        batch_settings=bs,
-    )
-    base_sim.attach_generator_files(to_configure=base_case_path)
-    exp.generate(base_sim, overwrite=True, tag="!")
-    exp.start(base_sim, block=True, summary=True)
+block = not config["optimization"]["repeated_trials_parallel"]
+n_repeat = config["optimization"]["n_repeat_trials"]
+#for i in range(n_repeat):
+#    base_sim = exp.create_model(
+#        f"base_sim_{i}",
+#        params={
+#                "startTime" : sim_config["startTime"],
+#                "endTime": sim_config["startTime"] + sim_config["duration"],
+#                "writeInterval" : sim_config["writeInterval"],
+#                "deltaT" : sim_config["deltaT"]
+#            } | sim_config["gamg"],
+#        run_settings=rs,
+#        batch_settings=bs,
+#    )
+#    base_sim.attach_generator_files(to_configure=base_case_path)
+#    exp.generate(base_sim, overwrite=True, tag="!")
+#    if i == n_repeat - 1:
+#        block = True
+#    exp.start(base_sim, block=block, summary=True)
 
-# perform repeated runs
-def chunk_dict(d, chunk_size):
-    it = iter(d.items())
-    while True:
-        chunk = dict(islice(it, chunk_size))
-        if not chunk:
-            break
-        yield chunk
+block_timing = []
+for i in range(n_repeat):
+    path = join(exp.exp_path, f"base_sim_{i}", "postProcessing", "time", "0", "timeInfo.dat")
+    df = read_csv(
+            path,
+            header=None,
+            sep=r"\s+",
+            skiprows=1,
+            usecols=[0, 1],
+            names=["t", "t_cpu_sum"],
+        )
+    block_timing.append(df.t_cpu_sum.values.reshape((-1, 1)))
+block_timing = np.concatenate(block_timing, axis=1)
+np.save(join(exp.exp_path, "cum_cpu_time.npy"), block_timing)
 
-opt_config = config["optimization"]
-for i, startTime in enumerate(opt_config["startTime"]):
-    trials = {j : sim_config["gamg"] for j in range(opt_config["repeat_trials"])}
-    results = {}
-    for chunk in chunk_dict(trials, opt_config["batch_size"]):
-        results = results | run_parameter_variation(exp=exp, trials=chunk, config=config, time_idx=i)
-    print(results, results.values())
-    pd.DataFrame(results.values(), columns=("time",)).to_csv(join(exp.exp_path, f"timing_int_{i}.csv"))
+    
