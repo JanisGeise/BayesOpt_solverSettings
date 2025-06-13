@@ -29,23 +29,23 @@ rs = RunSettings(exe="bash", exe_args="Allrun.pre")
 bs = batch_settings_from_config(exp, config.get("batch_settings"))
 block = not config["optimization"]["repeated_trials_parallel"]
 n_repeat = config["optimization"]["n_repeat_trials"]
-#for i in range(n_repeat):
-#    base_sim = exp.create_model(
-#        f"base_sim_{i}",
-#        params={
-#                "startTime" : sim_config["startTime"],
-#                "endTime": sim_config["startTime"] + sim_config["duration"],
-#                "writeInterval" : sim_config["writeInterval"],
-#                "deltaT" : sim_config["deltaT"]
-#            } | sim_config["gamg"],
-#        run_settings=rs,
-#        batch_settings=bs,
-#    )
-#    base_sim.attach_generator_files(to_configure=base_case_path)
-#    exp.generate(base_sim, overwrite=True, tag="!")
-#    if i == n_repeat - 1:
-#        block = True
-#    exp.start(base_sim, block=block, summary=True)
+for i in range(n_repeat):
+    base_sim = exp.create_model(
+        f"base_sim_{i}",
+        params={
+                "startTime" : sim_config["startTime"],
+                "endTime": sim_config["startTime"] + sim_config["duration"],
+                "writeInterval" : sim_config["writeInterval"],
+                "deltaT" : sim_config["deltaT"]
+            } | sim_config["gamg"],
+        run_settings=rs,
+        batch_settings=bs,
+    )
+    base_sim.attach_generator_files(to_configure=base_case_path)
+    exp.generate(base_sim, overwrite=True, tag="!")
+    if i == n_repeat - 1:
+        block = True
+    exp.start(base_sim, block=block, summary=True)
 
 block_timing = []
 for i in range(n_repeat):
