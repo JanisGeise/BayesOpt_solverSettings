@@ -5,7 +5,7 @@ from yaml import safe_load
 from pandas import read_csv
 import numpy as np
 from smartsim import Experiment
-from smartsim.settings import RunSettings
+from smartsim.settings import RunSettings, MpirunSettings, SrunSettings
 from execution import batch_settings_from_config
 
 
@@ -63,12 +63,14 @@ for i in range(n_repeat):
 
 # run solver for each copy
 block = not config["optimization"]["repeated_trials_parallel"]
+launcher = config["experiment"]["launcher"]
+settings_class = MpirunSettings if launcher == "local" else SrunSettings
+
 solver = sim_config["solver"]
 for i in range(n_repeat):
-    solver_settings = exp.create_run_settings(
+    solver_settings = settings_class(
         exe=solver,
         exe_args=f"-case {models_repeat[i].path} -parallel",
-        run_command=sim_config["run_command"],
         run_args=sim_config["run_args"]
     )
     solver_model = exp.create_model(
