@@ -44,6 +44,7 @@ exp.generate(base_sim, overwrite=True, tag="!")
 exp.start(base_sim, block=True, summary=True)
 
 # create setups for repeated runs
+block = not config["optimization"]["repeated_trials_parallel"]
 n_repeat = config["optimization"]["n_repeat_trials"]
 rs = RunSettings(exe="bash", exe_args="link_procs")
 params["baseCase"] = "../base_sim"
@@ -59,13 +60,14 @@ for i in range(n_repeat):
     )
     models_repeat[-1].attach_generator_files(to_configure=base_case_path)
     exp.generate(models_repeat[-1], overwrite=True, tag="!")
-    exp.start(models_repeat[-1], block=True, summary=True)
+    if i == n_repeat - 1:
+        block = True
+    exp.start(models_repeat[-1], block=block, summary=True)
 
 # run solver for each copy
 block = not config["optimization"]["repeated_trials_parallel"]
 launcher = config["experiment"]["launcher"]
 settings_class = MpirunSettings if launcher == "local" else SrunSettings
-
 solver = sim_config["solver"]
 for i in range(n_repeat):
     solver_settings = settings_class(
