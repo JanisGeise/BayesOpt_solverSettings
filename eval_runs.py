@@ -82,11 +82,11 @@ def plot_trial_vs_base(config, ax_clients):
     flierprops = dict(
         marker="o",
         markersize=1,
-        markerfacecolor="red",
+        markerfacecolor="C3",
         linestyle="none",
-        markeredgecolor="red",
+        markeredgecolor="C3",
     )
-    boxprops = dict(linewidth=0.5, color="black")
+    boxprops = dict(linewidth=0.5, color="C7")
     selected_indices = [
         i
         for i, t in enumerate(x_centers)
@@ -104,7 +104,7 @@ def plot_trial_vs_base(config, ax_clients):
         boxprops=boxprops,
     )
 
-    ax.bar(t_plot, mean_array, width=step * 0.001 * 0.9, align="edge", color="skyblue")
+    ax.bar(t_plot, mean_array, width=step * 0.001 * 0.9, align="edge", color="C3")
     xlim_upper = float(config["simulation"]["startTime"]) + float(
         config["simulation"]["duration"]
     )
@@ -124,7 +124,7 @@ def plot_trial_vs_base(config, ax_clients):
                 data,
                 marker="x",
                 s=10,
-                c="red",
+                c="C9",
                 label="trials",
                 linewidth=0.5,
                 alpha=0.5,
@@ -135,7 +135,7 @@ def plot_trial_vs_base(config, ax_clients):
                 data,
                 marker="x",
                 s=10,
-                c="red",
+                c="C9",
                 linewidth=0.5,
                 alpha=0.5,
             )
@@ -460,23 +460,23 @@ def plot_gaussian_process(config, ax_clients):
                     label="95% CI",
                 )
                 ax_gp.scatter(
-                    obs_x, obs_y, color="blue", label="Observed Trials", marker="x", s=2
+                    obs_x, obs_y, color="C0", label="Observed Trials", marker="x", s=2
                 )
                 low_lim, up_lim = config["optimization"]["gamg"][param_name]["bounds"]
                 ax_gp.set_xlim(low_lim, up_lim)
             elif isinstance(param, ChoiceParameter):
-                ax_gp.bar(grid, y_vals, color="skyblue", label="Mean Prediction")
+                ax_gp.bar(grid, y_vals, color="C9", label="Mean Prediction")
                 ax_gp.errorbar(
                     grid,
                     y_vals,
                     yerr=1.96 * y_std,
                     fmt="o",
-                    color="r",
+                    color="C3",
                     capsize=2,
                     label="95% CI",
                 )
                 ax_gp.scatter(
-                    obs_x, obs_y, color="blue", label="Observed Trials", marker="x", s=2
+                    obs_x, obs_y, color="C0", label="Observed Trials", marker="x", s=2
                 )
                 for label in ax_gp.get_xticklabels():
                     label.set_rotation(30)
@@ -636,7 +636,7 @@ def plot_cross_validation(config, ax_clients):
         ax.plot(
             [min(y_true), max(y_true)],
             [min(y_true), max(y_true)],
-            "r--",
+            color='C9', linestyle='--',
             label="Ideal: y = x",
         )
         ax.set_xlabel("Observed")
