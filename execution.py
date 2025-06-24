@@ -51,9 +51,8 @@ def extract_runtime(
             return bad_value
         else:
             # discard first time step
-            # normalize with the number of time steps
             t_cum = df["t_cpu_cum"].values
-            return (t_cum[-1] - t_cum[0]) / (len(t_cum) - 1)
+            return t_cum[-1] - t_cum[0]
     except:
         return bad_value
     
