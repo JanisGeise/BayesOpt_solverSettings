@@ -111,6 +111,7 @@ evaluation:
   plots:
     trial_vs_base:
       isReq: True
+      timesteps: 350 # defaults to opt_duration/dt is not specified
     best_params: 
       isReq: True
       top_N: 5

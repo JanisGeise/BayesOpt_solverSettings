@@ -15,6 +15,9 @@ from ax.modelbridge.cross_validation import cross_validate
 import os
 import matplotlib as mpl
 from ax.analysis.plotly.parallel_coordinates import ParallelCoordinatesPlot
+from scipy.interpolate import interp1d
+from matplotlib.ticker import MaxNLocator, FormatStrFormatter
+from adjustText import adjust_text
 
 
 def plot_trial_vs_base(config, ax_clients):
@@ -59,12 +62,21 @@ def plot_trial_vs_base(config, ax_clients):
             names=["t", "t_cpu_cum"],
         )
         data_li.append(base_timing)
-    dur = float(config["optimization"]["duration"])
-    step = int(dur / float(config["optimization"]["deltaT"]))
+    config_base = config["evaluation"]["plots"]["trial_vs_base"]
+    sim_dur = float(config["simulation"]["duration"])
+    opt_dur = float(config["optimization"]["duration"])
+    dt = float(config["optimization"]["deltaT"])
+    step = int(config_base.get("timesteps", opt_dur / dt))
+
     mean_li = []
     for base_timing in data_li:
-        t_plot = base_timing.t.values[step - 1 :: step] - step * 0.001
-        t_cum_plot = base_timing.t_cpu_cum.values[step - 1 :: step]
+        f = interp1d(base_timing.t.values, base_timing.t_cpu_cum.values)
+        t_inter = np.linspace(dt, sim_dur, int(sim_dur / dt))
+        t_cpu_cum_inter = f(t_inter)
+
+        t_plot = t_inter[step - 1 :: step] - step * dt
+        t_cum_plot = t_cpu_cum_inter[step - 1 :: step]
+
         t_cum_plot = (
             np.concatenate((t_cum_plot[:1], t_cum_plot[1:] - t_cum_plot[:-1])) / step
         )
@@ -74,9 +86,11 @@ def plot_trial_vs_base(config, ax_clients):
     mean_array = np.mean(np.stack(mean_li), axis=0)
 
     fig, ax = plt.subplots(figsize=(6, 2.5))
-    x_centers = t_plot + step * 0.001 * 0.9 / 2
+    x_centers = t_plot + step * dt * 0.9 / 2
+    normalizer = x_centers[-1] + step * dt * 0.9 / 2
+    x_centers = x_centers / normalizer
     selected_times = [
-        x + step * 0.001 * 0.9 / 2
+        (x + step * dt * 0.9 / 2) / normalizer
         for x in map(float, config["optimization"]["startTime"])
     ]
     flierprops = dict(
@@ -86,41 +100,43 @@ def plot_trial_vs_base(config, ax_clients):
         linestyle="none",
         markeredgecolor="C3",
     )
-    boxprops = dict(linewidth=0.5, color="C7")
-    selected_indices = [
-        i
-        for i, t in enumerate(x_centers)
-        if np.isclose(t, selected_times, atol=1e-6).any()
-    ]
+    boxprops = dict(linewidth=0.5, color="C9")
+    selected_indices = sorted(
+        set(i for st in selected_times for i in np.argsort(np.abs(x_centers - st))[:2])
+    )
+
     filtered_box_li = box_li[:, selected_indices]
     filtered_x_centers = x_centers[selected_indices]
 
     ax.boxplot(
         filtered_box_li,
         positions=filtered_x_centers,
-        widths=step * 0.001 * 0.9,
+        widths=step * dt * 0.9 / normalizer,
         patch_artist=False,
         flierprops=flierprops,
         boxprops=boxprops,
     )
-
-    ax.bar(t_plot, mean_array, width=step * 0.001 * 0.9, align="edge", color="C3")
-    xlim_upper = float(config["simulation"]["startTime"]) + float(
-        config["simulation"]["duration"]
+    ax.bar(
+        t_plot / normalizer,
+        mean_array,
+        width=step * dt * 0.9 / normalizer,
+        align="edge",
+        color="C3",
     )
-    ax.set_xlim(0, xlim_upper)
+
+    ax.set_xlim(0, 1)
     ax.set_xlabel(r"$\tilde{t}$")
     ax.set_ylabel(r"$T_{{{stept}\Delta t}}$".format(stept=step))
     ax.set_title("Execution time for base case - {} time steps".format(step))
-    ax.set_xticks([1, 2, 3, 4, 5, 6])
-    ax.set_xticklabels([1, 2, 3, 4, 5, 6])
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=6))
+    ax.xaxis.set_major_formatter(FormatStrFormatter("%.2f"))
 
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
 
         data = ax_clients[i].experiment.fetch_data().df["mean"].values
         if i == 0:
             ax.scatter(
-                [float(st_i) + step * 0.001 * 0.9 / 2] * len(data),
+                [(float(st_i) + step * dt * 0.9 / 2) / normalizer] * len(data),
                 data,
                 marker="x",
                 s=10,
@@ -131,7 +147,7 @@ def plot_trial_vs_base(config, ax_clients):
             )
         else:
             ax.scatter(
-                [float(st_i) + step * 0.001 * 0.9 / 2] * len(data),
+                [(float(st_i) + step * dt * 0.9 / 2) / normalizer] * len(data),
                 data,
                 marker="x",
                 s=10,
@@ -182,11 +198,22 @@ def plot_best_params(config, ax_clients):
     """
     dic_best = {}
     rows = []
+    if "top_N" not in config.get("evaluation", {}).get("plots", {}).get(
+        "best_params", {}
+    ):
+        raise ValueError("top_N parameter not defined")
+    top_n = config["evaluation"]["plots"]["best_params"]["top_N"]
+
     for i, st_i in enumerate(config["optimization"]["startTime"][:]):
         ax_client = ax_clients[i]
         df_trials = ax_client.get_trials_data_frame()
-        df_trials = df_trials.query("trial_status == 'COMPLETED'")
-        df_sorted = df_trials.sort_values(by="execution_time", ascending=True).head(5)
+        df_trials = df_trials.query("trial_status == 'COMPLETED'").copy()
+        first_time = df_trials["execution_time"].iloc[0]
+
+        df_trials["execution_time"] = df_trials["execution_time"] / first_time
+        df_sorted = df_trials.sort_values(by="execution_time", ascending=True).head(
+            top_n
+        )
         dic_best[float(st_i)] = ax_client.get_best_parameters()
         for rank, trial_index in enumerate(df_sorted.trial_index, start=1):
             params = ax_client.experiment.trials[trial_index].arm.parameters.copy()
@@ -208,49 +235,58 @@ def plot_best_params(config, ax_clients):
         if not set(sel).issubset(param_cols):
             raise ValueError("Selected params not in BO params")
         param_cols = sel
-    cmap = mpl.colormaps.get_cmap("tab10")
     path = join(config["evaluation"]["output_path"], "best_params")
     makedirs(path, exist_ok=True)
-    if "top_N" not in config.get("evaluation", {}).get("plots", {}).get(
-        "best_params", {}
-    ):
-        raise ValueError("top_N parameter not defined")
-    top_n = config["evaluation"]["plots"]["best_params"]["top_N"]
     max_z = top_n + 10
     for p in param_cols:
-        fig, ax = plt.subplots(figsize=(10, 5))
+        fig, (ax1, ax2) = plt.subplots(
+            2, 1, figsize=(10, 8), sharex=True, gridspec_kw={"height_ratios": [2, 1]}
+        )
+
+        texts = []
         for rank in range(1, top_n + 1):
             slice_i = df[df["rank"] == rank]
             x = slice_i["interval"]
-            y = slice_i[p]
-            c = slice_i["execution_time"]
-            ax.plot(
+            y = slice_i["execution_time"]
+            vals = slice_i[p]
+            ax1.plot(
                 x,
                 y,
-                color=cmap((rank - 1) % cmap.N),
                 linewidth=1,
                 alpha=0.7,
+                marker="o",
                 label=f"rank {rank}",
                 zorder=max_z - rank,
             )
+            for xi, yi, val in zip(x, y, vals):
+                text_obj = ax1.text(
+                    xi,
+                    yi,
+                    f"{val}",
+                    fontsize=7,
+                    ha="left",
+                    va="bottom",
+                    alpha=0.6,
+                )
+                texts.append(text_obj)
+        ad = adjust_text(
+            texts,
+            ax=ax1,
+            expand_text=(1.3, 1.5),  # Space multiplier in x/y
+            expand_points=(1.2, 1.5),
+            force_text=0.75,
+        )
+        ymin, ymax = ax1.get_ylim()
+        ax1.set_ylim(ymin, ymax + 0.1 * (ymax - ymin))
+        ax1.set_ylabel("Normalized execution time")
+        ax1.set_title(f"{p}: Execution time vs Interval (Top {top_n} trials)")
+        ax1.legend(title="Trial Rank", loc="upper right")
 
-            scatter = ax.scatter(
-                x,
-                y,
-                c=c,
-                cmap="viridis",
-                s=70,
-                edgecolors="k",
-                zorder=max_z - rank + 0.5,
-            )
-
-        ax.set_title(f"Ranking best params - {p} across optimisation intervals")
-        ax.set_xlabel("interval")
-        ax.set_ylabel(p)
-        ax.legend(title="trial rank")
-
-        cbar = fig.colorbar(scatter, ax=ax)
-        cbar.set_label("Execution Time (s)")
+        best_df = df[df["rank"] == 1]
+        ax2.plot(best_df["interval"], best_df[p], color="C3", marker="o")
+        ax2.set_xlabel("Interval")
+        ax2.set_ylabel(p)
+        ax2.set_title(f"{p}: Best parameter value across intervals")
 
         fig.tight_layout()
         fig.savefig(
@@ -550,7 +586,7 @@ def plot_feature_importance(config, ax_clients):
         sorted_items = sorted(aggregated_importances.items(), key=lambda x: -x[1])
         params, values = zip(*sorted_items)
         fig, ax = plt.subplots(figsize=(6, 2.5))
-        ax.bar(params, values, color="skyblue")
+        ax.bar(params, values, color="C3")
         ax.set_xlabel("Parameters")
         ax.set_ylabel("Importance")
         ax.set_title("Feature Importance - interval={}".format(st_i))
@@ -636,7 +672,8 @@ def plot_cross_validation(config, ax_clients):
         ax.plot(
             [min(y_true), max(y_true)],
             [min(y_true), max(y_true)],
-            color='C9', linestyle='--',
+            color="C9",
+            linestyle="--",
             label="Ideal: y = x",
         )
         ax.set_xlabel("Observed")
@@ -651,6 +688,7 @@ def plot_cross_validation(config, ax_clients):
             transparent=True,
         )
         plt.close(fig)
+
 
 def plot_parallel_coordinates(config, ax_clients):
     """
