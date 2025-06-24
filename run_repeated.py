@@ -55,7 +55,7 @@ for i in range(n_repeat):
             f"base_sim_{i}",
             params=params,
             run_settings=rs,
-            batch_settings=bs
+            batch_settings=None
         )
     )
     models_repeat[-1].attach_generator_files(to_configure=base_case_path)

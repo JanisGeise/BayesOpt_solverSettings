@@ -1,6 +1,5 @@
 #!/bin/bash
 cd "$(dirname "$(realpath "$0")")" || exit
-. "${WM_PROJECT_DIR:?}"/bin/tools/RunFunctions
 #------------------------------------------------------------------------------
 
 BASE_CASE_PATH="$(realpath !baseCase!)"
