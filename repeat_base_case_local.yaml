@@ -1,0 +1,40 @@
+simulation:
+  base_case: "test_cases/cylinder_2D_Re100"
+  solver: "pimpleFoam"
+  run_args:
+    np: 2
+  startTime: 0
+  duration: 0.05
+  writeInterval: 10
+  deltaT: 1.0e-3
+  gamg:
+    smoother: "DICGaussSeidel"
+    tolerance: 1e-06
+    relTol: 0.01
+    cacheAgglomeration: "yes"
+    nCellsInCoarsestLevel: 10
+    processorAgglomerator: "none"
+    nPreSweeps: 0
+    preSweepsLevelMultiplier: 1
+    maxPreSweeps: 10
+    nPostSweeps: 2
+    postSweepsLevelMultiplier: 1
+    maxPostSweeps: 10
+    nFinestSweeps: 2
+    interpolateCorrection: "no"
+    scaleCorrection: "yes"
+    directSolveCoarsest: "no"
+    solverCoarsest: "PCG"
+    preconditionerCoarsest: "DIC"
+    toleranceCoarsest: 1e-06
+    relTolCoarsest: 0.01
+
+experiment:
+  name: "cylinder2D-repeat"
+  exp_path: "run/cylinder2D-repeat"
+  launcher: "local"
+
+optimization:
+  n_repeat_trials: 2
+  repeated_trials_parallel: False
+
