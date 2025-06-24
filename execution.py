@@ -60,7 +60,9 @@ def extract_runtime(
 
 def batch_settings_from_config(exp: Experiment, batch_config: dict) -> Union[BatchSettings, None]:
     if batch_config is not None:
-        bs = exp.create_batch_settings(batch_args=batch_config.get("batch_args"))
+        batch_args = batch_config.get("batch_args")
+        nodes = batch_args.get("nodes") if batch_args else None
+        bs = exp.create_batch_settings(batch_args=batch_args, nodes=nodes)
         if "preamble" in batch_config:
             bs.add_preamble(batch_config["preamble"])
     else:
