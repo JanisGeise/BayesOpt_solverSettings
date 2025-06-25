@@ -5,7 +5,7 @@ from math import log10
 from logging import INFO
 from yaml import safe_load
 from smartsim import Experiment
-from smartsim.settings import RunSettings
+from smartsim.settings import RunSettings, MpirunSettings, SrunSettings
 from ax.service.ax_client import AxClient
 from ax.generation_strategy.generation_strategy import GenerationStrategy, GenerationStep
 from ax.modelbridge.registry import Generators
@@ -35,6 +35,7 @@ base_name = base_case_path.split("/")[-1]
 rs = RunSettings(exe="bash", exe_args="Allrun.pre")
 bs = batch_settings_from_config(exp, config.get("batch_settings"))
 if not isdir(join(exp.exp_path, "base_sim")):
+    # preprocessing and initialization
     base_sim = exp.create_model(
         "base_sim",
         params={
@@ -49,6 +50,20 @@ if not isdir(join(exp.exp_path, "base_sim")):
     base_sim.attach_generator_files(to_configure=base_case_path)
     exp.generate(base_sim, overwrite=True, tag="!")
     exp.start(base_sim, block=True, summary=True)
+    # initial solver execution
+    launcher = config["experiment"]["launcher"]
+    settings_class = MpirunSettings if launcher == "local" else SrunSettings
+    rs = settings_class(
+        exe=sim_config["solver"],
+        exe_args=f"-case {base_sim.path} -parallel",
+        run_args=sim_config.get("run_args")
+    )
+    base_solver = exp.create_model(
+        name="base_sim_solve",
+        run_settings=rs,
+        batch_settings=bs
+    )
+    exp.start(base_solver, block=True, summary=True)
 
 # perform optimization
 opt_config = config["optimization"]

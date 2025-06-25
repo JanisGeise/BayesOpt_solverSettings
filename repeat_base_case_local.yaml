@@ -1,8 +1,11 @@
 simulation:
   base_case: "test_cases/cylinder_2D_Re100"
+  solver: "pimpleFoam"
+  run_args:
+    np: 2
   startTime: 0
-  duration: 1.0e-3
-  writeInterval: 0.5
+  duration: 1
+  writeInterval: 10
   deltaT: 1.0e-3
   gamg:
     smoother: "DICGaussSeidel"
@@ -27,16 +30,11 @@ simulation:
     relTolCoarsest: 0.01
 
 experiment:
-  name: "cylinder2D-2"
-  exp_path: "run/cylinder2D-2"
+  name: "cylinder2D-repeat"
+  exp_path: "run/cylinder2D-repeat"
   launcher: "local"
 
 optimization:
-  startTime: [0]
-  duration: 0.05
-  writeInterval: 6
-  deltaT: 1.0e-3
-  repeat_trials: 2
-  batch_size: 1
-  bad_value: 0
+  n_repeat_trials: 2
+  repeated_trials_parallel: False
 
