@@ -9,7 +9,7 @@ from collections import defaultdict
 from math import sqrt
 from time import sleep
 from smartsim import Experiment
-from smartsim.settings import RunSettings
+from smartsim.settings import RunSettings, MpirunSettings, SrunSettings
 from smartsim.settings.base import BatchSettings
 from smartsim.entity import Model
 import numpy as np
@@ -51,16 +51,17 @@ def extract_runtime(
             return bad_value
         else:
             # discard first time step
-            # normalize with the number of time steps
             t_cum = df["t_cpu_cum"].values
-            return (t_cum[-1] - t_cum[0]) / (len(t_cum) - 1)
+            return t_cum[-1] - t_cum[0]
     except:
         return bad_value
     
 
 def batch_settings_from_config(exp: Experiment, batch_config: dict) -> Union[BatchSettings, None]:
     if batch_config is not None:
-        bs = exp.create_batch_settings(batch_args=batch_config.get("batch_args"))
+        batch_args = batch_config.get("batch_args")
+        nodes = batch_args.get("nodes") if batch_args else None
+        bs = exp.create_batch_settings(batch_args=batch_args, nodes=nodes)
         if "preamble" in batch_config:
             bs.add_preamble(batch_config["preamble"])
     else:
@@ -71,8 +72,9 @@ def batch_settings_from_config(exp: Experiment, batch_config: dict) -> Union[Bat
 def run_parameter_variation(
     exp: Experiment, trials: dict, config: dict, time_idx: int
 ) -> Dict[int, float]:
+    # create a copy for each trial and link the processor folders
     opt_config = config["optimization"]
-    rs = RunSettings(exe="bash", exe_args="Allrun.solve")
+    rs = RunSettings(exe="bash", exe_args="link_procs")
     bs = batch_settings_from_config(exp, config.get("batch_settings"))
     path = join(exp.exp_path, "base_sim", "processor0")
     startTime = find_closest_time(path, opt_config["startTime"][time_idx])
@@ -104,26 +106,55 @@ def run_parameter_variation(
         params=params,
         perm_strategy="step",
         run_settings=rs,
-        batch_settings=bs
+        batch_settings=None
     )
     base_case_path = config["simulation"]["base_case"]
     ens.attach_generator_files(to_configure=base_case_path)
     exp.generate(ens, overwrite=True, tag="!")
+    exp.start(ens, block=True, summary=True)
+
+    # run solver
+    launcher = config["experiment"]["launcher"]
+    solver = config["simulation"]["solver"]
+    settings_class = MpirunSettings if launcher == "local" else SrunSettings
     if opt_config["repeated_trials_parallel"]:
-        n_parallel = opt_config["batch_size"] * opt_config["n_repeat_trials"]
+        solver_models = []
         for model_i in ens.models:
-            model_i.batch_settings = bs
-            exp.start(model_i, block=False)
-        while not all(exp.finished(model_i) for model_i in ens.models):
+            solver_settings = settings_class(
+                exe=solver,
+                exe_args=f"-case {model_i.path} -parallel",
+                run_args=config["simulation"].get("run_args")
+            )
+            solver_models.append(
+                exp.create_model(
+                    name=f"{model_i.name}_{solver}",
+                    run_settings=solver_settings,
+                    batch_settings=bs
+                )
+            )
+            exp.start(solver_models[-1], block=False)
+        while not all(exp.finished(model_i) for model_i in solver_models):
             sleep(2)
     else:
         n_parallel = opt_config["batch_size"]
         for i in range(0, len(ens.models), n_parallel):
             ens_batch = ens.models[i:i+n_parallel]
+            solver_models = []
             for model_i in ens_batch:
-                model_i.batch_settings = bs
-                exp.start(model_i, block=False)
-            while not all(exp.finished(model_i) for model_i in ens_batch):
+                solver_settings = settings_class(
+                    exe=solver,
+                    exe_args=f"-case {model_i.path} -parallel",
+                    run_args=config["simulation"].get("run_args")
+                )
+                solver_models.append(
+                    exp.create_model(
+                        name=f"{model_i.name}_{solver}",
+                        run_settings=solver_settings,
+                        batch_settings=bs
+                    )
+                )
+                exp.start(solver_models[-1], block=False)
+            while not all(exp.finished(model_i) for model_i in solver_models):
                 sleep(2)
     runtimes = [
         extract_runtime(

@@ -15,6 +15,5 @@ runApplication setExprBoundaryFields
 runApplication decomposePar
 runParallel renumberMesh -overwrite
 runParallel potentialFoam -writephi
-runParallel $(getApplication)
 
 #------------------------------------------------------------------------------

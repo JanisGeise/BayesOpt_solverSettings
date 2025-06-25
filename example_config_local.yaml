@@ -1,5 +1,8 @@
 simulation:
   base_case: "test_cases/cylinder_2D_Re100"
+  solver: "pimpleFoam"
+  run_args:
+    np: 2
   startTime: 0
   duration: 1
   writeInterval: 0.5
@@ -27,8 +30,8 @@ simulation:
     relTolCoarsest: 0.01
 
 experiment:
-  name: "cylinder2D-2"
-  exp_path: "run/cylinder2D-2"
+  name: "cylinder2D-bo"
+  exp_path: "run/cylinder2D-bo"
   launcher: "local"
 
 optimization:
