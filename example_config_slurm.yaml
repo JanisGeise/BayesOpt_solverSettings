@@ -49,7 +49,7 @@ optimization:
   writeInterval: 1
   deltaT: 1.0e-3
   sobol_trials: 10
-  bo_trials: 40
+  bo_trials: 70
   batch_size: 1
   n_repeat_trials: 3
   repeated_trials_parallel: False
@@ -57,8 +57,8 @@ optimization:
   seed: 0
   device: "cpu"
   stopping:
-    min_trials: 20
-    window_size: 5
+    min_trials: 30
+    window_size: 10 
     improvement_bar: 0.01
   gamg:
     smoother:
@@ -90,14 +90,57 @@ optimization:
       type: "range"
       value_type: "int"
       bounds: [1, 10]
-    tolerance:
-      name: "tolerance"
+    nCellsInCoarsestLevel:
+      name: "nCellsInCoarsestLevel"
+      type: "range"
+      value_type: "int"
+      bounds: [2, 1000]
+    toleranceCoarsest:
+      name: "toleranceCoarsest"
       type: "range"
       value_type: "float"
-      bounds: [-9, -6] # log10 space
-    relTol:
-      name: "relTol"
+      bounds: [-8, -2] # log10 space
+    relTolCoarsest:
+      name: "relTolCoarsest"
       type: "range"
       value_type: "float"
-      bounds: [-3, -1] # log10 space
-
+      bounds: [-5, -2] # log10 space
+evaluation:
+  output_path: "output"
+  benchmark_path: "benchmark_time_info"
+  plots:
+    trial_vs_base:
+      isReq: True
+    best_params: 
+      isReq: True
+      top_N: 5
+      plot_scope:
+        type: "all" # "selected or all"
+        selected_params: ["smoother", "nPostSweeps"] # required if type == "selected"
+    trial_vs_obj:
+      isReq: True
+    gaussian_process:
+      isReq: True
+      plot_scope:
+        type: "all" #  "selected or all"
+        selected_params: ["smoother", "nPostSweeps"] # required if type == "selected"
+      param_setting:
+        type: "marginalization" #  "optimal, fixed or marginalization"
+        n_marginal_samples: 100 # required if type == "marginalization"
+        fixed_values: # required if type == "fixed"
+          smoother: "FDIC"
+          interpolateCorrection: "yes"
+          nPreSweeps: 2
+          nPostSweeps: 4
+          nFinestSweeps: 1
+          nCellsInCoarsestLevel: 10
+          toleranceCoarsest: -6
+          relTolCoarsest: -2
+    feature_importance:
+        isReq: True
+    cross_validation:
+        isReq: True  
+    parallel_coordinates:
+        isReq: True
+  plot_attributes:
+    style_sheet: "classic" # "dark_background, classic or any other from matplotlib"
