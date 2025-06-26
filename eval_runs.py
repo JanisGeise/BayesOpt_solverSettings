@@ -22,12 +22,14 @@ from adjustText import adjust_text
 
 def plot_trial_vs_base(config, ax_clients):
     """
-    Plot base-case execution time vs. optimization trial results.
+    Plot execution time comparison between baseline simulations and optimization
+    trials.
 
-    This function compares cumulative CPU execution times from a set of
-    baseline simulations to execution times from trials run during a
-    Bayesian optimization loop. The base data is summarized with a bar
-    plot and boxplot, while trial performance is plotted as scatter points.
+    This function analyzes and visualizes the CPU execution time of baseline
+    simulations (benchmark runs) versus trials performed during a Bayesian
+    optimization process. It interpolates cumulative execution time from base
+    runs and compares it to results from each trial at selected optimization
+    start times.
 
     Parameters
     ----------
@@ -37,6 +39,8 @@ def plot_trial_vs_base(config, ax_clients):
         like:
             - evaluation.benchmark_path : Path to base-case run folders.
             - evaluation.output_path : Directory to save the generated plot.
+            - evaluation.plots.trial_vs_base.timesteps : Optional. Integer 
+                              number of time steps to group execution time.
     ax_clients : list of AxClient
         List of AxClient instances, each representing optimization runs for
         different intervals.
@@ -166,14 +170,18 @@ def plot_trial_vs_base(config, ax_clients):
 
 def plot_best_params(config, ax_clients):
     """
-    Plot the best parameters across different optimization intervals.
+    Visualize the best parameters across different optimization intervals.
 
-    This function extracts the top-N best parameters obtained from Bayesian optimization
-    for each specified interval (start time), and generates line plots showing how
-    the best values of each parameter evolves with the interval. The user can choose
-    to plot only a subset of parameters through the configuration. The markers are colored
-    to signify the execution times and the ranking of the best parameter sets is done by
-    coloring the lines.
+    This function processes results from multiple Bayesian optimization runs,
+    each corresponding to a different simulation interval (start time),
+    and visualizes the best-performing parameter sets across intervals.
+
+    It ranks completed trials within each optimization run based on execution time,
+    selects the top-N best trials, and generates line plots for each parameter:
+        - The top-N trial execution times are shown across intervals with line plots,
+          color-coded by rank and annotated with actual parameter values.
+        - The second subplot shows how the best value of each parameter evolves
+          across intervals.
 
     Parameters
     ----------
