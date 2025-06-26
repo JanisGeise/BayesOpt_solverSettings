@@ -280,7 +280,7 @@ def plot_best_params(config, ax_clients):
         ax1.set_ylim(ymin, ymax + 0.1 * (ymax - ymin))
         ax1.set_ylabel("Normalized execution time")
         ax1.set_title(f"{p}: Execution time vs Interval (Top {top_n} trials)")
-        ax1.legend(title="Trial Rank", loc="upper right")
+        ax1.legend(title="Trial Rank", loc="best")
 
         best_df = df[df["rank"] == 1]
         ax2.plot(best_df["interval"], best_df[p], color="C3", marker="o")

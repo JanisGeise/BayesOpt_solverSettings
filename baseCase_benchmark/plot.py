@@ -9,12 +9,21 @@ import sys
 from scipy.interpolate import interp1d
 from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 
-config_file = sys.argv[1] if len(sys.argv) > 1 else "config.yaml"
-try:
-    with open(config_file, "r") as cf:
-        config = safe_load(cf)
-except Exception as e:
-    print(e)
+
+def parse_args(argv):
+    if "--duration" not in argv or "--deltaT" not in argv:
+        raise ValueError("Both --duration and --deltaT arguments are required.")
+
+    try:
+        duration_index = argv.index("--duration") + 1
+        deltaT_index = argv.index("--deltaT") + 1
+
+        sim_dur = float(argv[duration_index])
+        dt = float(argv[deltaT_index])
+    except (IndexError, ValueError):
+        raise ValueError("Invalid or missing values for --duration or --deltaT. Both must be floats.")
+
+    return sim_dur, dt
 
 pwd = os.getcwd()
 fol = os.path.join(pwd, "benchmark_time_info")
@@ -39,10 +48,7 @@ for fold in folder:
     )
     data_li.append(base_timing)
 
-sim_dur = float(config["simulation"]["duration"])
-opt_dur = float(config["optimization"]["duration"])
-dt = float(config["optimization"]["deltaT"])
-
+sim_dur, dt = parse_args(sys.argv)
 steps = [30, 100, 200, 300, 500]
 # normalizer = [sim_dur - 0.5 * step * dt * 0.9 for step in steps]
 
