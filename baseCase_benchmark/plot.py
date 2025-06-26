@@ -4,9 +4,29 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from matplotlib.lines import Line2D
+from yaml import safe_load
+import sys
+from scipy.interpolate import interp1d
+from matplotlib.ticker import MaxNLocator, FormatStrFormatter
+
+
+def parse_args(argv):
+    if "--duration" not in argv or "--deltaT" not in argv:
+        raise ValueError("Both --duration and --deltaT arguments are required.")
+
+    try:
+        duration_index = argv.index("--duration") + 1
+        deltaT_index = argv.index("--deltaT") + 1
+
+        sim_dur = float(argv[duration_index])
+        dt = float(argv[deltaT_index])
+    except (IndexError, ValueError):
+        raise ValueError("Invalid or missing values for --duration or --deltaT. Both must be floats.")
+
+    return sim_dur, dt
 
 pwd = os.getcwd()
-fol = os.path.join(pwd, "openfoam_cases")
+fol = os.path.join(pwd, "benchmark_time_info")
 folder = os.listdir(fol)
 data_li = []
 t_plot_li = []
@@ -19,21 +39,35 @@ for fold in folder:
     run = fold
     base_sim_path = os.path.join(fol, run)
     base_timing = pd.read_csv(
-        os.path.join(base_sim_path, "postProcessing", "time", "0", "timeInfo.dat"),
+        os.path.join(base_sim_path),
         header=None,
         sep=r"\s+",
         skiprows=1,
         usecols=[0, 1],
         names=["t", "t_cpu_cum"],
-        )
+    )
     data_li.append(base_timing)
-steps = [25, 50, 75, 100]
+
+sim_dur, dt = parse_args(sys.argv)
+steps = [30, 100, 200, 300, 500]
+# normalizer = [sim_dur - 0.5 * step * dt * 0.9 for step in steps]
+
 for step in steps:
     mean_li = []
     for base_timing in data_li:
-        t_plot = base_timing.t.values[step-1::step] - step*0.001
-        t_cum_plot = base_timing.t_cpu_cum.values[step-1::step]
-        t_cum_plot = np.concatenate((t_cum_plot[:1], t_cum_plot[1:]-t_cum_plot[:-1]))/step
+        f = interp1d(base_timing.t.values, base_timing.t_cpu_cum.values)
+        t_inter = np.linspace(dt, sim_dur, int(sim_dur / dt))
+        t_cpu_cum_inter = f(t_inter)
+
+        # t_plot = base_timing.t.values[step - 1 :: step] - step * 0.001
+        # t_cum_plot = base_timing.t_cpu_cum.values[step - 1 :: step]
+
+        t_plot = t_inter[step - 1 :: step] - step * dt
+        t_cum_plot = t_cpu_cum_inter[step - 1 :: step]
+
+        t_cum_plot = (
+            np.concatenate((t_cum_plot[:1], t_cum_plot[1:] - t_cum_plot[:-1])) / step
+        )
         mean_li.append(t_cum_plot)
 
     box_li = np.array(mean_li)
@@ -46,30 +80,60 @@ for step in steps:
     t_cum_plot_li_max.append(max_array)
     t_cum_plot_li_min.append(min_array)
     t_plot_li.append(t_plot)
-    
+
 for ind in range(len(t_cum_plot_li)):
     fig, ax = plt.subplots(figsize=(6, 2.5))
-    x_centers = t_plot_li[ind]+steps[ind]*0.001*0.9/2
-    flierprops = dict(marker='o', markersize=1, markerfacecolor='red', linestyle='none', markeredgecolor="red")
-    boxprops = dict(linewidth=0.5, color='black')
-    ax.boxplot(t_cum_plot_box_li[ind], positions=x_centers, widths=steps[ind]*0.001*0.9, patch_artist=False, flierprops=flierprops, boxprops=boxprops)
-    ax.bar(t_plot_li[ind], t_cum_plot_li[ind], width=steps[ind]*0.001*0.9, align="edge")
-    
-    ax.set_xlim(0, 6)
-    ax.set_ylim(0, 0.25)
+    x_centers = t_plot_li[ind] + steps[ind] * dt * 0.9 / 2
+    normalizer = x_centers[-1] + steps[ind] * dt * 0.9 / 2
+    x_centers = x_centers / normalizer
+
+    flierprops = dict(
+        marker="o",
+        markersize=1,
+        markerfacecolor="red",
+        linestyle="none",
+        markeredgecolor="red",
+    )
+    boxprops = dict(linewidth=0.5, color="black")
+    ax.boxplot(
+        t_cum_plot_box_li[ind],
+        positions=x_centers,
+        widths=steps[ind] * dt * 0.9 / normalizer,
+        patch_artist=False,
+        flierprops=flierprops,
+        boxprops=boxprops,
+    )
+    ax.bar(
+        t_plot_li[ind] / normalizer,
+        t_cum_plot_li[ind],
+        width=steps[ind] * dt * 0.9 / normalizer,
+        align="edge",
+    )
+
     ax.set_xlabel(r"$\tilde{t}$")
     step = steps[ind]
-    ax.set_ylabel(r"$T_{{{stept}\Delta t}}$".format(stept = step))
-    ax.set_title("Execution time for base case - {} time steps".format(step))
-    ax.set_xticks([1, 2, 3, 4, 5, 6])
-    
-    ax.set_xticklabels([1, 2, 3, 4, 5, 6])
-    fig.savefig("exe_time_{}_time_steps.svg".format(steps[ind]), bbox_inches="tight", transparent=True)
+    ax.set_ylabel(r"$T_{{{stept}\Delta t}}$".format(stept=step))
+    ax.set_title("Execution time for buffet base case - {} time steps".format(step))
+    ax.set_xlim(0, 1)
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=6))
+    ax.xaxis.set_major_formatter(FormatStrFormatter("%.2f"))
 
-fig1, ax1 = plt.subplots( figsize=(10, 5))
-colors = ["red", "blue", "black", "purple"]
+    fig.savefig(
+        "exe_time_{}_time_steps.svg".format(steps[ind]),
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+fig1, ax1 = plt.subplots(figsize=(10, 5))
+colors = ["red", "blue", "black", "purple", "green"]
 for ind in range(len(t_cum_plot_li)):
-    ax1.plot(t_plot_li[ind], t_cum_plot_li[ind], marker=".", label = "{}".format(steps[ind]), color = colors[ind])
+    ax1.plot(
+        t_plot_li[ind],
+        t_cum_plot_li[ind],
+        marker=".",
+        label="{}".format(steps[ind]),
+        color=colors[ind],
+    )
 
 
 ax1.set_xlabel(r"$\tilde{t}$")
