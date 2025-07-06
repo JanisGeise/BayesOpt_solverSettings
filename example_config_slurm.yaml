@@ -108,6 +108,9 @@ optimization:
 evaluation:
   output_path: "output"
   benchmark_path: "benchmark_time_info"
+  write_trial_data:
+    isReq: True
+    top_N: 5
   plots:
     trial_vs_base:
       isReq: True

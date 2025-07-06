@@ -750,6 +750,48 @@ def plot_parallel_coordinates(config, ax_clients):
             height=800,
         )
 
+def write_trial_data(config, ax_clients):
+    """
+    Write the top-N best trial data from each optimization interval to CSV files.
+
+    This function extracts the top-N best trials (based on normalized execution time)
+    for each optimization interval and writes them to individual CSV files.
+    These files are saved in a folder named "trial_data" within the evaluation
+    output path. The function only runs if 'isReq' is set to True in the config.
+
+    Parameters
+    ----------
+    config : dict
+        Configuration dictionary used for the Bayesian optimization run,
+        containing the following required keys:
+            - evaluation.output_path : Path to save the CSV files.
+            - evaluation.write_trial_data.top_N : Number of best trials to write.
+    ax_clients : list of AxClient
+        List of AxClient instances, each representing optimization runs for
+        different intervals.
+
+    Returns
+    -------
+    None
+        The function saves a CSV file for each interval but does not return any value.
+    """
+    write_cfg = config.get("evaluation", {}).get("write_trial_data", {})
+
+    if "top_N" not in write_cfg:
+        raise ValueError("Missing required key: evaluation.write_trial_data.top_N")
+    
+    top_n = write_cfg["top_N"]
+    output_path = os.path.join(config["evaluation"]["output_path"], "trial_data")
+    os.makedirs(output_path, exist_ok=True)
+
+    for i, st_i in enumerate(config["optimization"]["startTime"][:]):
+        ax_client = ax_clients[i]
+        df_trials = ax_client.get_trials_data_frame()
+        df_trials = df_trials.query("trial_status == 'COMPLETED'").copy()
+
+        df_sorted = df_trials.sort_values(by="execution_time", ascending=True).head(top_n)
+        filename = os.path.join(output_path, f"top_trials_interval_{i}.csv")
+        df_sorted.to_csv(filename, index=False)
 
 if __name__ == "__main__":
 
@@ -788,3 +830,5 @@ if __name__ == "__main__":
         plot_cross_validation(config, ax_clients)
     if config_eval["plots"]["parallel_coordinates"]["isReq"]:
         plot_parallel_coordinates(config, ax_clients)
+    if config_eval["write_trial_data"]["isReq"]:
+        write_trial_data(config, ax_clients)
