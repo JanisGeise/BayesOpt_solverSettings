@@ -1,0 +1,63 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2006                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     rhoPimpleFoam;
+
+startFrom       startTime;
+
+startTime       !startTime!;
+
+stopAt          endTime;
+
+endTime         !endTime!;
+
+deltaT          !deltaT!;
+
+writeControl    runTime;
+
+writeInterval   !writeInterval!;
+
+purgeWrite      0;
+
+writeFormat     binary;
+
+writePrecision  8;
+
+timeFormat      general;
+
+timePrecision   8;
+
+runTimeModifiable true;
+
+adjustTimeStep  yes;
+
+maxCo           0.95;
+
+maxDeltaT       1e-6;
+
+functions
+{
+    time
+    {
+        type            timeInfo;
+        libs            (utilityFunctionObjects);
+        timeStart       0;
+        perTimeStep     yes;
+    }
+}
+
+
+// ************************************************************************* //

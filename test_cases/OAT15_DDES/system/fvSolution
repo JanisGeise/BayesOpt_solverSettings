@@ -1,0 +1,115 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2006                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    p
+    {
+        solver                    GAMG;
+        smoother                  !smoother!;
+        tolerance                 !tolerance!;
+        relTol                    !relTol!;
+        cacheAgglomeration        !cacheAgglomeration!;
+        nCellsInCoarsestLevel     !nCellsInCoarsestLevel!;
+        processorAgglomerator     !processorAgglomerator!;
+        nPreSweeps                !nPreSweeps!;
+        preSweepsLevelMultiplier  !preSweepsLevelMultiplier!;
+        maxPreSweeps              !maxPreSweeps!;
+        nPostSweeps               !nPostSweeps!;
+        postSweepsLevelMultiplier !postSweepsLevelMultiplier!;
+        maxPostSweeps             !maxPostSweeps!;
+        nFinestSweeps             !nFinestSweeps!;
+        interpolateCorrection     !interpolateCorrection!;
+        directSolveCoarsest       !directSolveCoarsest!;
+        coarsestLevelCorr
+        {
+            solver          !solverCoarsest!;
+            preconditioner  !preconditionerCoarsest!;
+            tolerance       !toleranceCoarsest!;
+            relTol          !relTolCoarsest!;
+        }
+    }
+
+    pFinal
+    {
+        $p;
+        relTol          0;
+    }
+
+    "(rho|U|e|R|nuTilda)"
+    {
+        solver          PBiCGStab;
+        preconditioner  DILU;
+        tolerance       1e-8;
+        relTol          0.01;
+    }
+
+    "(rho|U|e|R|nuTilda)Final"
+    {
+        $U;
+        relTol          0;
+    }
+
+   Phi
+    {
+        solver          GAMG;
+        smoother        FDIC;
+        tolerance       1e-04;
+        relTol          0.01;
+    }
+
+    cellDisplacement
+    {
+    	solver          GAMG;
+    	smoother        GaussSeidel;
+    	tolerance       1e-7;
+    	relTol          0.01;
+    }
+}
+
+potentialFlow
+{
+    nNonOrthogonalCorrectors 3;
+}
+
+PIMPLE
+{
+    momentumPredictor   yes;
+    transonic           yes;
+    nOuterCorrectors    25;
+    nCorrectors         1;
+    nNonOrthogonalCorrectors 2;
+    consistent          yes;
+
+    residualControl
+    {
+        "(U|p|e|nuTilda)"
+        {
+            relTol          0;
+            tolerance       1.0e-5;
+        }
+    }
+}
+
+relaxationFactors
+{ 
+    equations
+    {
+        "(U|nuTilda|e|p|rho).*"     0.7;
+    }
+}
+
+// ************************************************************************* //

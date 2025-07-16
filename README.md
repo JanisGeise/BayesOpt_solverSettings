@@ -102,8 +102,12 @@ The resources required for running a simulation are specified in *batch_settings
 
 ## Test case
 
-The current test case is a 2D, laminar flow past a cylinder taken from the
-[flow_data](https://github.com/AndreWeiner/flow_data) repository.
+The current test cases are 2D laminar flow past a cylinder taken from the
+[flow_data](https://github.com/AndreWeiner/flow_data) repository, 2D Transonic buffet for OAT15 using DDES and URANS turbulence models. The stl file for the OAT15 setup is not provided. The absolute path (absolute path is required) to the "airfoil.stl" must be provided in the respective "Allrun.pre" file, where the following line should be edited accordingly,
+```
+    cp /path/to/airfoil.stl constant/triSurface
+```
+
 
 More test cases etc. will follow
 
@@ -111,13 +115,14 @@ More test cases etc. will follow
 
 The evaluation of trial runs can be done using the "eval_runs.py" script. The script make evaluation plots, whose settings can be controlled from the config file. Different plots that are output from the script -
 
-1. "trial vs base" - It compares the execution time of the trials at different intervals with the default settings case. This plot requires the execution time data of benchmark cases. Data in the required structure can be generated using "copy_data.sh" script in the "baseCase_benchmark" folder. The path to this folder needs to be provided in the config file.
-2. "best parms" - Makes parallel plots of best parameters from the optimization across different intervals
-3. "trial vs obj" - Plot to check how the objective function varies over trials
-4. "gaussian process" - Makes the gaussian process plot for a given parameters
-5. "featureImportance" - Ranks the importance of different parameters considered for BO
-6. "crossValidation" - Plots predicted outcome against actual outcome, signifies accuracy of the predictions
-
+1. "trial_vs_base" - It compares the execution time of the trials at different intervals with the default settings case. This plot requires the execution time data of benchmark cases. Data in the required structure can be generated using "copy_data.sh" script in the "baseCase_benchmark" folder. The path to this folder needs to be provided in the config file.
+2. "best_parms" - Makes parallel plots of best parameters from the optimization across different intervals
+3. "trial_vs_obj" - Plot to check how the objective function varies over trials
+4. "gaussian_process" - Makes the gaussian process plot for a given parameters
+5. "feature_importance" - Ranks the importance of different parameters considered for BO
+6. "cross_validation" - Plots predicted outcome against actual outcome, signifies accuracy of the predictions
+7. "parallel_coordinates" - Parallel coordinates plot of parameters selected for different trials along with the objective function
+8. "write_trial_data" - Writes a csv file containing the information of top trials
 Run the script by giving the config file as the argument using, for example 
 
 ```

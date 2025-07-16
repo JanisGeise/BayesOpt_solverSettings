@@ -1,0 +1,40 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2206                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+maskedCelikNuFieldIndex
+{
+    type    multiply;
+    libs    (fieldFunctionObjects);
+
+    fields
+    (
+        DESField
+        CelikNuField
+    );
+    result          maskedCelikNuField;
+
+    executeControl  timeStep;
+    executeInterval 1;
+    writeControl    writeTime;
+    writeInterval   1;
+    timeStart       4e-3;
+}
+
+maskedCelikEtaFieldIndex
+{
+    $maskedCelikNuFieldIndex;
+    fields
+    (
+        DESField
+        CelikEtaField
+    );
+    result          maskedCelikEtaField;
+}
+
+
+// ************************************************************************* //

@@ -1,0 +1,139 @@
+simulation:
+  base_case: "test_cases/OAT15_URANS"
+  solver: "rhoPimpleFoam"
+  run_args:
+    cpu_bind: "verbose,cores"
+  startTime: 0
+  duration: 0.001
+  writeInterval: 0.5
+  deltaT: 5.0e-7
+  gamg:
+    smoother: "GaussSeidel"
+    tolerance: 1e-08
+    relTol: 0.01
+    cacheAgglomeration: "yes"
+    nCellsInCoarsestLevel: 10
+    processorAgglomerator: "none"
+    nPreSweeps: 0
+    preSweepsLevelMultiplier: 1
+    maxPreSweeps: 10
+    nPostSweeps: 2
+    postSweepsLevelMultiplier: 1
+    maxPostSweeps: 10
+    nFinestSweeps: 2
+    interpolateCorrection: "no"
+    directSolveCoarsest: "no"
+    solverCoarsest: "PBiCGStab"
+    preconditionerCoarsest: "DILU"
+    toleranceCoarsest: 1e-06
+    relTolCoarsest: 0.01
+
+experiment:
+  name: "OAT15_URANS"
+  exp_path: "run/OAT15_URANS"
+  launcher: "slurm"
+
+batch_settings:
+  batch_args:
+    nodes: 1
+    time: "01:30:00"
+    tasks-per-node: 100
+    partition: "barnard"
+  preamble: ["module load release/24.04 GCC/12.3.0 OpenMPI/4.1.5 OpenFOAM/v2406 Python/3.11.3", "source $FOAM_BASH", "source /data/horse/ws/tata993f-general_testing/BayesOpt_solverSettings/bopt/bin/activate"]
+
+optimization:
+  startTime: [0]
+  duration: 1.5e-5
+  writeInterval: 1
+  deltaT: 5.0e-7
+  sobol_trials: 5
+  bo_trials: 10
+  batch_size: 1
+  n_repeat_trials: 3
+  repeated_trials_parallel: False
+  bad_value: 0.5
+  seed: 0
+  device: "cpu"
+  stopping:
+    min_trials: 10
+    window_size: 10
+    improvement_bar: 0.01
+  gamg:
+    smoother:
+      name: "smoother"
+      type: "choice"
+      value_type: "str"
+      is_ordered: False
+      sort_values: False
+      values: ["DILU", "DILUGaussSeidel", "GaussSeidel", "symGaussSeidel", "nonBlockingGaussSeidel"]
+    interpolateCorrection:
+      name: "interpolateCorrection"
+      type: "choice"
+      value_type: "str"
+      is_ordered: False
+      sort_values: False
+      values: ["yes", "no"]
+    nPreSweeps:
+      name: "nPreSweeps"
+      type: "range"
+      value_type: "int"
+      bounds: [0, 10]
+    nPostSweeps:
+      name: "nPostSweeps"
+      type: "range"
+      value_type: "int"
+      bounds: [0, 10]
+    nFinestSweeps:
+      name: "nFinestSweeps"
+      type: "range"
+      value_type: "int"
+      bounds: [1, 10]
+    nCellsInCoarsestLevel:
+      name: "nCellsInCoarsestLevel"
+      type: "range"
+      value_type: "int"
+      bounds: [2, 1000]
+evaluation:
+  output_path: "output/bo_OAT15_URANS"
+  benchmark_path: "../benchmark_time_info/OAT_15_URANS"
+  write_trial_data:
+    isReq: True
+    top_N: 5
+  plots:
+    trial_vs_base:
+      isReq: True
+      timesteps: 350 # defaults to opt_duration/dt is not specified
+    best_params:
+      isReq: True
+      top_N: 5
+      plot_scope:
+        type: "all" # "selected or all"
+        selected_params: ["smoother", "nPostSweeps"] # required if type == "selected"
+    trial_vs_obj:
+      isReq: True
+    gaussian_process:
+      isReq: True
+      plot_scope:
+        type: "all" #  "selected or all"
+        selected_params: ["smoother", "nPostSweeps"] # required if type == "selected"
+      param_setting:
+        type: "marginalization" #  "optimal, fixed or marginalization"
+        n_marginal_samples: 100 # required if type == "marginalization"
+        fixed_values: # required if type == "fixed"
+          smoother: "FDIC"
+          interpolateCorrection: "yes"
+          nPreSweeps: 2
+          nPostSweeps: 4
+          nFinestSweeps: 1
+          nCellsInCoarsestLevel: 10
+          toleranceCoarsest: -6
+          relTolCoarsest: -2
+    feature_importance:
+        isReq: True
+    cross_validation:
+        isReq: True
+    parallel_coordinates:
+        isReq: True
+  plot_attributes:
+    style_sheet: "classic" # "dark_background, classic or any other from matplotlib"
+
