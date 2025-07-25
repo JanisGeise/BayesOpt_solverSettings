@@ -1,0 +1,10 @@
+#!/bin/bash
+cd "${0%/*}" || exit
+. "${WM_PROJECT_DIR:?}"/bin/tools/CleanFunctions
+#------------------------------------------------------------------------------
+
+cleanCase0
+mv system/fvOptions system/fvOptions_bak
+rm -r 0 post.foam constant/extendedFeatureEdgeMesh constant/triSurface
+
+#------------------------------------------------------------------------------

@@ -1,0 +1,115 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.1.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+scale 1;
+
+vertices
+(
+    (-4.5 0.0 -4.5) // 0
+    (4.5  0.0 -4.5) // 1
+    (4.5  0.0  4.5)  // 2
+    (-4.5 0.0  4.5) // 3
+    (-4.5  -0.02 -4.5) // 4
+    (4.5  -0.02 -4.5) // 5
+    (4.5  -0.02  4.5) // 6
+    (-4.5  -0.02 4.5) // 7
+     
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (60 60 1) simpleGrading (1 1 1) 
+);
+
+edges
+(
+);
+
+boundary
+(
+
+    minX
+    {
+        type patch;
+        faces
+        (
+            (0 4 7 3)
+        );
+    }
+
+    maxX
+    {
+        type patch;
+        faces
+        (
+            (2 6 5 1)
+        );
+    }
+
+    minY
+    {
+        type patch;
+        faces
+        (
+            (0 4 5 1)
+        );
+    }
+
+    maxY
+    {
+        type patch;
+        faces
+        (
+            (2 6 7 3)
+        );
+    }
+
+    front
+    {
+        // if empty snappy hangs up, will be overwritten later anyway, cyclic doesn't work -> snappy crashes, symmetryPlane worked once but for some reason crashes now in rhoPimpleFoam bc inconsistent
+        // type patch;
+        // type empty;
+        type symmetryPlane;
+        // type cyclic;
+        // neighbourPatch  back;
+        faces
+        (
+            (0 1 2 3)
+        );
+    }
+
+    back
+    {
+        // if empty snappy hangs up, will be overwritten later anyway, cyclic doesn't work -> snappy crashes, symmetryPlane worked once but for some reason crashes now in rhoPimpleFoam bc inconsistent
+        // type patch;
+        // type empty;
+        type symmetryPlane;
+        // type cyclic;
+        // neighbourPatch  front;
+        faces
+        (
+            (4 5 6 7)
+
+        );
+    }
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

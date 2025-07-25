@@ -1,0 +1,68 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2006                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+// taken from https://develop.openfoam.com/Development/openfoam/-/blob/OpenFOAM-v2412/tutorials/incompressible/pimpleFoam/LES/NACA4412/0.orig/U
+Uinlet          238.845;    // free stream velocity
+AoA             5.0;        // angle of attack
+beta            0.0;        // sweep angle
+
+Ux              #eval{$Uinlet * cos(degToRad($AoA)) };
+Uz              #eval{$Uinlet * sin(degToRad($AoA)) };
+
+Uinfinity         ($Ux  0.0 $Uz);
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform $Uinfinity;
+
+boundaryField
+{
+    outerBoundary
+    {
+        type            freestreamVelocity;
+        freestreamValue uniform $Uinfinity;
+    }
+
+    airfoil
+    {
+        type            noSlip;
+    }
+
+    Front
+    {
+        type            cyclic;
+    }
+
+    Back
+    {
+        type            cyclic;
+    }
+    
+    processor
+    {
+        type  processor;
+        value $internalField;
+    }
+
+    processorCyclic
+    {
+        type  processorCyclic;
+        value $internalField;
+    }
+}
+
+// ************************************************************************* //

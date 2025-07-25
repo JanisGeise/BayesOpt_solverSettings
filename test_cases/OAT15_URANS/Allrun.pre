@@ -1,0 +1,20 @@
+#!/bin/bash
+cd "$(dirname "$(realpath "$0")")" || exit
+. "${WM_PROJECT_DIR:?}"/bin/tools/RunFunctions
+#------------------------------------------------------------------------------
+
+# check if already been meshed, e.g. when re-starting simulation from previous time step we need to avoid this step
+if [ ! -d "constant/polyMesh" ]; then
+    # execute meshing
+    cp /path/to/airfoil.stl constant/triSurface
+    bash Allrun.mesh
+    cp -r 0.orig 0
+    mv "system/fvOptions_bak" "system/fvOptions"
+else
+  echo "Meshing already executed. To re-run the meshing step execute the Allclean script."
+fi
+
+# decompose and renumber
+runApplication decomposePar
+runParallel renumberMesh -overwrite
+
